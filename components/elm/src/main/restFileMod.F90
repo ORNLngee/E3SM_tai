@@ -329,6 +329,7 @@ contains
 
     call solarabs_vars%restart (bounds, ncid, flag='write')
 
+
     call grc_wf%Restart (bounds, ncid, flag='write')
 
     call col_wf%Restart (bounds, ncid, flag='write')
@@ -551,6 +552,7 @@ contains
     call soilstate_vars%restart (bounds, ncid, flag='read')
 
     call solarabs_vars%restart (bounds, ncid, flag='read')
+
 
     call grc_wf%Restart (bounds, ncid, flag='read')
 
@@ -1003,6 +1005,7 @@ contains
     call restFile_add_ipft_metadata(ncid)
     call restFile_add_icol_metadata(ncid)
     call restFile_add_ilun_metadata(ncid)
+
 
   end subroutine restFile_dimset
 

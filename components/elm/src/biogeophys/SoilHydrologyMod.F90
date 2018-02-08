@@ -93,8 +93,10 @@ contains
          hksat            =>    soilstate_vars%hksat_col            , & ! Input:  [real(r8) (:,:) ]  hydraulic conductivity at saturation (mm H2O /s)
          bsw              =>    soilstate_vars%bsw_col              , & ! Input:  [real(r8) (:,:) ]  Clapp and Hornberger "b"
 
-         h2osoi_ice       =>    col_ws%h2osoi_ice      , & ! Input:  [real(r8) (:,:) ]  ice lens (kg/m2)
-         h2osoi_liq       =>    col_ws%h2osoi_liq      , & ! Output: [real(r8) (:,:) ]  liquid water (kg/m2)
+
+         h2osoi_ice       =>    col_ws%h2osoi_ice      , & ! Input:  [real(r8) (:,:) ]  ice lens (kg/m2)                                
+         h2osoi_liq       =>    col_ws%h2osoi_liq      , & ! Output: [real(r8) (:,:) ]  liquid water (kg/m2)                            
+         h2osfc           =>    col_ws%h2osfc          , & !Output: [real(r8) (:)   ]  surface water (mm) 
 
          qflx_snow_h2osfc =>    col_wf%qflx_snow_h2osfc , & ! Input:  [real(r8) (:)   ]  snow falling on surface water (mm/s)
          qflx_floodc      =>    col_wf%qflx_floodc      , & ! Input:  [real(r8) (:)   ]  column flux of flood water from RTM
@@ -178,10 +180,12 @@ contains
             else
                fsat(c) = wtfact(c) * exp(-0.5_r8*fff(c)*zwt(c))
             end if
+
          else
             if ( frost_table(c) > zwt_perched(c)) then
                fsat(c) = wtfact(c) * exp(-0.5_r8*fff(c)*zwt_perched(c))!*( frost_table(c) - zwt_perched(c))/4.0
             endif
+
          endif
          if (origflag == 1) then
             if (use_vichydro) then
@@ -201,10 +205,10 @@ contains
 
          ! assume qinmax large relative to qflx_top_soil in control
          if (origflag == 1) then
-            qflx_surf(c) =  fcov(c) * qflx_top_soil(c)
+           qflx_surf(c) = fcov(c) * qflx_top_soil(c)
          else
             ! only send fast runoff directly to streams
-            qflx_surf(c) =   fsat(c) * qflx_top_soil(c)
+            qflx_surf(c) = fsat(c) * qflx_top_soil(c) !TAO
          endif
       end do
 
@@ -265,10 +269,13 @@ contains
      use elm_varcon       , only : pondmx, watmin
      use column_varcon    , only : icol_roof, icol_road_imperv, icol_sunwall, icol_shadewall, icol_road_perv
      use landunit_varcon  , only : istsoil, istcrop
-     use clm_time_manager , only : get_step_size, get_nstep
+     use clm_time_manager , only : get_nstep
      use atm2lndType      , only : atm2lnd_type ! land river two way coupling
      use lnd2atmType      , only : lnd2atm_type
      use subgridAveMod    , only : c2g
+     use abortutils       , only : endrun
+     use clm_time_manager , only : get_step_size, get_curr_date, get_curr_time
+     use elm_varcon       , only : secspday
      !
      ! !ARGUMENTS:
      type(bounds_type)        , intent(in)    :: bounds
@@ -370,7 +377,9 @@ contains
           ice                  =>    soilhydrology_vars%ice_col              , & ! Input:  [real(r8) (:,:) ]  ice len in each VIC layers(ice, mm)
           i_0                  =>    soilhydrology_vars%i_0_col              , & ! Input:  [real(r8) (:)   ]  column average soil moisture in top VIC layers (mm)
           h2osfcflag           =>    soilhydrology_vars%h2osfcflag           , & ! Input:  logical
-          icefrac              =>    soilhydrology_vars%icefrac_col            & ! Output: [real(r8) (:,:) ]  fraction of ice
+          icefrac              =>    soilhydrology_vars%icefrac_col          , & ! Output: [real(r8) (:,:) ]  fraction of ice
+          h2osoi_vol           =>    col_ws%h2osoi_vol                       , & ! Input: [real(r8) (:,:) ]  volumetric soil water (0<=h2osoi_vol<=watsat) [m3/m3]
+          zi                   =>    col_pp%zi                                 & ! Input: [real(r8) (:,:) ]  interface level below a "z" level (m)
               )
 
 
@@ -381,8 +390,8 @@ contains
           do j = 1,nlevbed
              ! Porosity of soil, partial volume of ice and liquid
              vol_ice(c,j) = min(watsat(c,j), h2osoi_ice(c,j)/(dz(c,j)*denice))
-             eff_porosity(c,j) = max(0.01_r8,watsat(c,j)-vol_ice(c,j))
-             icefrac(c,j) = min(1._r8,vol_ice(c,j)/watsat(c,j))
+             eff_porosity(c,j) = max(0.01_r8, watsat(c,j)-vol_ice(c,j))
+             icefrac(c,j) = min(1._r8, vol_ice(c,j)/watsat(c,j))
           end do
        end do
 
@@ -467,8 +476,8 @@ contains
              !4. soil infiltration and h2osfc "run-on"
              qflx_infl(c) = qflx_in_soil(c) - qflx_infl_excess(c)
              qflx_in_h2osfc(c) =  qflx_in_h2osfc(c) + qflx_infl_excess(c)
-             qflx_gross_infl_soil(c) = qflx_gross_infl_soil(c)- qflx_infl_excess(c)
 
+             qflx_gross_infl_soil(c) = qflx_gross_infl_soil(c)- qflx_infl_excess(c)
              !5. surface runoff from h2osfc
              if (h2osfcflag==1) then
                 ! calculate runoff from h2osfc  -------------------------------------
@@ -486,6 +495,7 @@ contains
                 qflx_h2osfc_surf(c) = k_wet * frac_infclust * (h2osfc(c) - h2osfc_thresh(c))
 
                 qflx_h2osfc_surf(c)=min(qflx_h2osfc_surf(c),(h2osfc(c) - h2osfc_thresh(c))/dtime)
+
              else
                 qflx_h2osfc_surf(c)= 0._r8
              endif
@@ -599,6 +609,7 @@ contains
       !$acc routine seq
      use elm_varcon       , only : pondmx, tfrz, watmin,denice,denh2o
      use elm_varpar       , only : nlevsoi, nlevgrnd
+     use clm_time_manager , only : get_step_size, get_curr_date, get_curr_time
      use column_varcon    , only : icol_roof, icol_road_imperv
      use elm_varctl       , only : use_vsfm, use_var_soil_thick
      use domainMod        , only : ldomain
@@ -651,7 +662,8 @@ contains
      real(r8) :: q_perch
      real(r8) :: q_perch_max
      real(r8) :: dflag=0._r8
-	 real(r8) :: qcharge_temp
+     real(r8) :: qcharge_temp
+     integer  :: days, seconds  
      !-----------------------------------------------------------------------
 
      associate(                                                            &
@@ -679,8 +691,8 @@ contains
           eff_porosity       =>    soilstate_vars%eff_porosity_col       , & ! Input:  [real(r8) (:,:) ]  effective porosity = porosity - vol_ice
 
           qflx_irrig         =>    col_wf%qflx_irrig         , & ! Input:  [real(r8) (:)   ]  irrigation flux (mm H2O /s)
-          qflx_grnd_irrig_col=>    col_wf%qflx_grnd_irrig    , & ! Output: [real(r8) (:)   ]  col real groundwater irrigation flux (mm H2O /s)
-
+          qflx_grnd_irrig_col=>    col_wf%qflx_grnd_irrig    , & ! Output: [real(r8) (:)   ]  col real groundwater irrigation flux (mm H2O /s)                                                                                                                                                               
+                        
           zwt                =>    soilhydrology_vars%zwt_col            , & ! Output: [real(r8) (:)   ]  water table depth (m)
           zwt_perched        =>    soilhydrology_vars%zwt_perched_col    , & ! Output: [real(r8) (:)   ]  perched water table depth (m)
           frost_table        =>    soilhydrology_vars%frost_table_col    , & ! Output: [real(r8) (:)   ]  frost table depth (m)
@@ -814,7 +826,6 @@ contains
           endif
           qcharge(c) = qcharge_temp
        enddo
-
 
        !==  BASEFLOW ==================================================
        ! perched water table code
@@ -1003,6 +1014,9 @@ contains
      real(r8) :: frac                     ! temporary variable for ARNO subsurface runoff calculation
      real(r8) :: rel_moist                ! relative moisture, temporary variable
      real(r8) :: wtsub_vic                ! summation of hk*dzmm for layers in the third VIC layer
+     real(r8) :: deep_seep                ! Deep seepage for SPRUCE
+     real(r8) :: qflx_adv_tot(bounds%begc:bounds%endc,1:nlevgrnd)             ! amount of water transported between layers during a time step (mm)
+
      !-----------------------------------------------------------------------
 
      associate(                                                            &
@@ -1051,9 +1065,10 @@ contains
           qflx_qrgwl         =>    col_wf%qflx_qrgwl         , & ! Output: [real(r8) (:)   ] qflx_surf at glaciers, wetlands, lakes (mm H2O /s)
           qflx_rsub_sat      =>    col_wf%qflx_rsub_sat      , & ! Output: [real(r8) (:)   ] soil saturation excess [mm h2o/s]
           qflx_drain_perched =>    col_wf%qflx_drain_perched , & ! Output: [real(r8) (:)   ] perched wt sub-surface runoff (mm H2O /s)
+          qflx_drain_vr       =>    col_wf%qflx_drain_vr       , & ! Output: [real(r8) (:)   ] sub-surface runoff (mm H2O /time step)
 
-          h2osoi_liq         =>    col_ws%h2osoi_liq        , & ! Output: [real(r8) (:,:) ] liquid water (kg/m2)
-          h2osoi_ice         =>    col_ws%h2osoi_ice          & ! Output: [real(r8) (:,:) ] ice lens (kg/m2)
+          h2osoi_liq         =>    col_ws%h2osoi_liq        , & ! Output: [real(r8) (:,:) ] liquid water (kg/m2)                            
+          h2osoi_ice         =>    col_ws%h2osoi_ice         & ! Output: [real(r8) (:,:) ] ice lens (kg/m2)   
           )
 
 
@@ -1080,6 +1095,7 @@ contains
           rsub_top(c)      = 0._r8
           fracice_rsub(c)  = 0._r8
           qflx_qrgwl(c)    = 0._r8
+          qflx_drain_vr(c,:) = 0._r8
        end do
 
        ! The layer index of the first unsaturated layer, i.e., the layer right above
@@ -1165,6 +1181,7 @@ contains
                 rsub_top_tot = rsub_top_tot - rsub_top_layer
 
                 h2osoi_liq(c,k) = h2osoi_liq(c,k) + rsub_top_layer
+                qflx_drain_vr(c,k) = qflx_drain_vr(c,k) - rsub_top_layer
 
                 if (rsub_top_tot >= 0.) then
                    zwt(c) = zwt(c) - rsub_top_layer/eff_porosity(c,k)/1000._r8
@@ -1249,6 +1266,7 @@ contains
                    rsub_top_tot = rsub_top_tot - rsub_top_layer
 
                    h2osoi_liq(c,k) = h2osoi_liq(c,k) + rsub_top_layer
+                   qflx_drain_vr(c,k) = qflx_drain_vr(c,k) - rsub_top_layer
 
                    if (rsub_top_tot >= 0.) then
                       zwt_perched(c) = zwt_perched(c) - rsub_top_layer/eff_porosity(c,k)/1000._r8
@@ -1276,7 +1294,7 @@ contains
                 icefracsum = icefracsum + icefrac(c,j) * dzmm(c,j)
              end do
              ! add ice impedance factor to baseflow
-             if(origflag == 1) then
+             if(origflag == 1) then 
                 if (use_vichydro) then
 #ifndef _OPENACC
                    call endrun(msg="VICHYDRO is not available for origflag=1"//errmsg(__FILE__, __LINE__))
@@ -1297,6 +1315,7 @@ contains
                    rsub_top_max = min(10._r8 * sin((rpi/180.) * col_pp%topo_slope(c)), rsub_top_globalmax)
                 end if
              endif
+
              if (use_vichydro) then
                 ! ARNO model for the bottom soil layer (based on bottom soil layer
                 ! moisture from previous time step
@@ -1340,6 +1359,7 @@ contains
                    rsub_top_layer=max(rsub_top_tot,-(s_y*(zi(c,nlevbed) - zwt(c))*1.e3))
                    rsub_top_layer=min(rsub_top_layer,0._r8)
                    h2osoi_liq(c,nlevbed) = h2osoi_liq(c,nlevbed) + rsub_top_layer
+                   qflx_drain_vr(c,nlevbed) = qflx_drain_vr(c,nlevbed) - rsub_top_layer
                    rsub_top_tot = rsub_top_tot - rsub_top_layer
                    if (rsub_top_tot >= 0.) then
                       zwt(c) = zwt(c) - rsub_top_layer/s_y/1000._r8
@@ -1391,6 +1411,7 @@ contains
                          rsub_top_layer=min(rsub_top_layer,0._r8)
                          if (use_vsfm) rsub_top_layer = 0._r8
                          h2osoi_liq(c,j) = h2osoi_liq(c,j) + rsub_top_layer
+                         qflx_drain_vr(c,j) = qflx_drain_vr(c,j) - rsub_top_layer
 
                          rsub_top_tot = rsub_top_tot - rsub_top_layer
 
@@ -1475,6 +1496,8 @@ contains
                 ! use original code to send water to drainage (non-h2osfc case)
                 qflx_rsub_sat(c)     = xs1(c) / dtime
              endif
+             ! Not sure if it makes sense to include this in qflx_drain_vr?
+            !  qflx_drain_vr(c,1) = qflx_drain_vr(c,1) + xs1(c)
           endif
 
           if (use_vsfm) qflx_rsub_sat(c) = 0._r8
@@ -1914,7 +1937,7 @@ contains
 #endif
                 else
                    fracice_rsub(c) = max(0._r8,exp(-3._r8*(1._r8-(icefracsum/dzsum))) &
-                        - exp(-3._r8))/(1.0_r8-exp(-3._r8))
+                        - exp(-3._r8))/(1.0_r8-exp(-3._r8)) 
                    imped=(1._r8 - fracice_rsub(c))
                    rsub_top_max = 5.5e-3_r8
                 end if

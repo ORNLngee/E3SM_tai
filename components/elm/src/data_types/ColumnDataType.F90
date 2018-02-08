@@ -1,5 +1,5 @@
 module ColumnDataType
-
+    
   !-----------------------------------------------------------------------
   ! !DESCRIPTION:
   ! Column data type allocation and initialization

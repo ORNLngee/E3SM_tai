@@ -338,8 +338,6 @@ contains
     begc = bounds%begc; endc= bounds%endc
     begg = bounds%begg; endg= bounds%endg
 
-
- 
   end subroutine InitHistory
 
   !-----------------------------------------------------------------------

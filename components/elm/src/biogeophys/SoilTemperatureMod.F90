@@ -174,12 +174,12 @@ contains
       !$acc routine seq
     use elm_varpar               , only : nlevsno, nlevgrnd, nlevurb
     use elm_varctl               , only : iulog
-    use elm_varcon               , only : cnfac, cpice, cpliq, denh2o
+    use elm_varcon               , only : cnfac, cpice, cpliq, denh2o, secspday
+    use clm_time_manager         , only : get_step_size, get_curr_date, get_curr_time
     use landunit_varcon          , only : istice, istice_mec, istsoil, istcrop
     use column_varcon            , only : icol_roof, icol_sunwall, icol_shadewall, icol_road_perv, icol_road_imperv
     use landunit_varcon          , only : istwet, istice, istice_mec, istsoil, istcrop
     use BandDiagonalMod          , only : BandDiagonal
-
     !
     ! !ARGUMENTS:
     type(bounds_type)      , intent(in)    :: bounds
@@ -225,6 +225,7 @@ contains
     integer  :: num_nolakec_and_nourbanc
     integer  :: num_nolakec_and_urbanc
     integer  :: num_filter_lun
+    integer  :: days, seconds
     integer, allocatable :: filter_nolakec_and_nourbanc(:)
     integer, allocatable :: filter_nolakec_and_urbanc(:)
     integer, allocatable :: filter_lun(:)
@@ -396,7 +397,7 @@ contains
            hs_top( begc:endc ),                                               &
            dhsdT( begc:endc ),                                                &
            sabg_lyr_col( begc:endc, -nlevsno+1: ),                            &
-           atm2lnd_vars, urbanparams_vars, canopystate_vars, &
+           urbanparams_vars, canopystate_vars, &
            solarabs_vars, energyflux_vars)
 
       ! Determine heat diffusion through the layer interface and factor used in computing
@@ -1652,7 +1653,7 @@ contains
   !-----------------------------------------------------------------------
   subroutine ComputeGroundHeatFluxAndDeriv(bounds, num_nolakec, filter_nolakec, &
        hs_h2osfc, hs_top_snow, hs_soil, hs_top, dhsdT, sabg_lyr_col, &
-       atm2lnd_vars, urbanparams_vars, canopystate_vars,  &
+       urbanparams_vars, canopystate_vars,  &
        solarabs_vars, energyflux_vars)
     !
     ! !DESCRIPTION:
@@ -1668,6 +1669,7 @@ contains
     use elm_varcon     , only : sb, hvap
     use column_varcon  , only : icol_road_perv, icol_road_imperv
     use elm_varpar     , only : nlevsno, max_patch_per_col
+
     !
     ! !ARGUMENTS:
     implicit none
@@ -1680,7 +1682,6 @@ contains
     real(r8)               , intent(out)   :: hs_top (bounds%begc: )                    ! net energy flux into surface layer (col) [W/m2]
     real(r8)               , intent(out)   :: dhsdT( bounds%begc: )                     ! temperature derivative of "hs" [col]
     real(r8)               , intent(out)   :: sabg_lyr_col( bounds%begc:, -nlevsno+1: ) ! absorbed solar radiation (col,lyr) [W/m2]
-    type(atm2lnd_type)     , intent(in)    :: atm2lnd_vars
     type(urbanparams_type) , intent(in)    :: urbanparams_vars
     type(canopystate_type) , intent(in)    :: canopystate_vars
     type(solarabs_type)    , intent(inout) :: solarabs_vars
@@ -1699,7 +1700,7 @@ contains
     real(r8) :: lwrad_emit_h2osfc(bounds%begc:bounds%endc)             !
     real(r8) :: eflx_gnet_snow                                         !
     real(r8) :: eflx_gnet_soil                                         !
-    real(r8) :: eflx_gnet_h2osfc                                       !
+    real(r8) :: eflx_gnet_h2osfc                                   !
     !-----------------------------------------------------------------------
 
     ! Enforce expected array sizes
@@ -1748,6 +1749,7 @@ contains
          sabg_snow               => solarabs_vars%sabg_snow_patch           , & ! Input:  [real(r8) (:)   ]  solar radiation absorbed by snow (W/m**2)
          sabg_chk                => solarabs_vars%sabg_chk_patch            , & ! Output: [real(r8) (:)   ]  sum of soil/snow using current fsno, for balance check
          sabg_lyr                => solarabs_vars%sabg_lyr_patch            , & ! Output: [real(r8) (:,:) ]  absorbed solar radiation (pft,lyr) [W/m2]
+
 
          begc                    => bounds%begc                             , & ! Input:  [integer        ] beginning column index
          endc                    => bounds%endc                               & ! Input:  [integer        ] ending column index

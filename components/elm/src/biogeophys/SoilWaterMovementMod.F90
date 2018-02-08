@@ -577,9 +577,6 @@ contains
       end do
 
       ! Set up r, a, b, and c vectors for tridiagonal solution
-
-      ! Node j=1 (top)
-
       j = 1
       do fc = 1, num_hydrologyc
          c = filter_hydrologyc(fc)
@@ -591,6 +588,7 @@ contains
          dqodw1(c,j) = -(-hk(c,j)*dsmpdw(c,j)   + num*dhkdw(c,j))/den
          dqodw2(c,j) = -( hk(c,j)*dsmpdw(c,j+1) + num*dhkdw(c,j))/den
          rmx(c,j) =  qin(c,j) - qout(c,j) - qflx_rootsoi_col(c,j)
+
          amx(c,j) =  0._r8
          bmx(c,j) =  dzmm(c,j)*(sdamp+1._r8/dtime) + dqodw1(c,j)
          cmx(c,j) =  dqodw2(c,j)
@@ -614,7 +612,8 @@ contains
             qout(c,j)   = -hk(c,j)*num/den
             dqodw1(c,j) = -(-hk(c,j)*dsmpdw(c,j)   + num*dhkdw(c,j))/den
             dqodw2(c,j) = -( hk(c,j)*dsmpdw(c,j+1) + num*dhkdw(c,j))/den
-            rmx(c,j)    =  qin(c,j) - qout(c,j) -  qflx_rootsoi_col(c,j)
+            rmx(c,j)    =  qin(c,j) - qout(c,j) - qflx_rootsoi_col(c,j)
+
             amx(c,j)    = -dqidw0(c,j)
             bmx(c,j)    =  dzmm(c,j)/dtime - dqidw1(c,j) + dqodw1(c,j)
             cmx(c,j)    =  dqodw2(c,j)
@@ -1195,7 +1194,7 @@ contains
       do fc = 1, num_filterc
          c = filterc(fc)
          nlevbed = nlev2bed(c)
-         do j = 1, nlevbed
+         do j = 1, nlevsoi
             rootr_col(c,j) = 0._r8
          end do
       end do

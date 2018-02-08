@@ -17,7 +17,7 @@ module CanopyFluxesMod
   use elm_varctl            , only : use_hydrstress
   use elm_varpar            , only : nlevgrnd, nlevsno
   use elm_varcon            , only : namep
-  use pftvarcon             , only : nbrdlf_dcd_tmp_shrub, nsoybean , nsoybeanirrig
+  use pftvarcon             , only : nbrdlf_dcd_tmp_shrub, nsoybean , nsoybeanirrig, slatop
   use decompMod             , only : bounds_type
   use PhotosynthesisMod     , only : Photosynthesis, PhotosynthesisTotal, Fractionation, PhotoSynthesisHydraulicStress
   use SoilMoistStressMod    , only : calc_effective_soilporosity, calc_volumetric_h2oliq
@@ -39,7 +39,7 @@ module CanopyFluxesMod
   use ColumnType            , only : col_pp
   use ColumnDataType        , only : col_es, col_ef, col_ws
   use VegetationType        , only : veg_pp
-  use VegetationDataType    , only : veg_es, veg_ef, veg_ws, veg_wf
+  use VegetationDataType    , only : veg_es, veg_ef, veg_ws, veg_wf, veg_ns
 
   !!! using elm_instMod messes with the compilation order
   use elm_instMod           , only : alm_fates, soil_water_retention_curve
@@ -441,6 +441,8 @@ contains
          eflx_sh_soil         => veg_ef%eflx_sh_soil        , & ! Output: [real(r8) (:)   ]  sensible heat flux from soil (W/m**2) [+ to atm]
          eflx_sh_veg          => veg_ef%eflx_sh_veg         , & ! Output: [real(r8) (:)   ]  sensible heat flux from leaves (W/m**2) [+ to atm]
          eflx_sh_grnd         => veg_ef%eflx_sh_grnd        , & ! Output: [real(r8) (:)   ]  sensible heat flux from ground (W/m**2) [+ to atm]
+         leafn                => veg_ns%leafn               , &
+
          begp                 => bounds%begp                               , &
          endp                 => bounds%endp                                 &
          )
@@ -849,6 +851,7 @@ contains
             svpts(p) = el(p)                         ! pa
             eah(p) = forc_pbot(t) * qaf(p) / 0.622_r8   ! pa
             rhaf(p) = eah(p)/svpts(p)
+
          end do
 
          ! Modification for shrubs proposed by X.D.Z
@@ -890,9 +893,9 @@ contains
                     canopystate_vars, photosyns_vars)
             else
                call Photosynthesis (bounds, fn, filterp, &
-                        svpts(begp:endp), eah(begp:endp), o2(begp:endp), co2(begp:endp), rb(begp:endp), btran(begp:endp), &
-                        dayl_factor(begp:endp), atm2lnd_vars,  surfalb_vars, solarabs_vars, &
-                        canopystate_vars, photosyns_vars, 'sun')
+                 svpts(begp:endp), eah(begp:endp), o2(begp:endp), co2(begp:endp), rb(begp:endp), btran(begp:endp), &
+                 dayl_factor(begp:endp), atm2lnd_vars, surfalb_vars, solarabs_vars, &
+                 canopystate_vars, photosyns_vars, phase='sun')
             end if
 
             if ( use_c13 ) then
