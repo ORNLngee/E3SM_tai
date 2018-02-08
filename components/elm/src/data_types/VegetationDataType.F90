@@ -68,6 +68,7 @@ module VegetationDataType
     real(r8), pointer :: t_ref2m_max_inst_u (:) => null() ! instantaneous daily max of average 2 m height surface air temp - urban (K)
     real(r8), pointer :: t_veg24            (:) => null() ! 24hr average vegetation temperature (K)
     real(r8), pointer :: t_veg240           (:) => null() ! 240hr average vegetation temperature (K)
+    real(r8), pointer :: t_2m3650           (:) => null() ! 10-year average 2-m temperature (K)
     real(r8), pointer :: gdd0               (:) => null() ! growing degree-days base  0C from planting  (ddays)
     real(r8), pointer :: gdd8               (:) => null() ! growing degree-days base  8C from planting  (ddays)
     real(r8), pointer :: gdd10              (:) => null() ! growing degree-days base 10C from planting  (ddays)
@@ -102,6 +103,8 @@ module VegetationDataType
     real(r8), pointer :: begwb        (:) => null() ! water mass begining of the time step
     real(r8), pointer :: endwb        (:) => null() ! water mass end of the time step
     real(r8), pointer :: errh2o       (:) => null() ! water conservation error (mm H2O)
+    real(r8), pointer :: h2o_moss_wc    (:) => null() ! Total water content of Sphagnum moss (relative to dry mass (relative to dry mass))
+    real(r8), pointer :: h2o_moss_inter (:) => null() ! Internal water content of Sphagnum moss (relative to dry mass (relative to dry mass))
   contains
     procedure, public :: Init    => veg_ws_init
     procedure, public :: Restart => veg_ws_restart
@@ -1091,6 +1094,7 @@ module VegetationDataType
     allocate(this%t_ref2m_max_inst_u (begp:endp))                   ; this%t_ref2m_max_inst_u (:)   = spval
     allocate(this%t_veg24            (begp:endp))                   ; this%t_veg24            (:)   = spval
     allocate(this%t_veg240           (begp:endp))                   ; this%t_veg240           (:)   = spval
+    allocate(this%t_2m3650           (begp:endp))                   ; this%t_2m3650           (:)   = spval
     allocate(this%gdd0               (begp:endp))                   ; this%gdd0               (:)   = spval
     allocate(this%gdd8               (begp:endp))                   ; this%gdd8               (:)   = spval
     allocate(this%gdd10              (begp:endp))                   ; this%gdd10              (:)   = spval
@@ -1181,6 +1185,11 @@ module VegetationDataType
     call hist_addfld1d (fname='TV240', units='K',  &
          avgflag='A', long_name='vegetation temperature (last 240hrs)', &
          ptr_patch=this%t_veg240, default='inactive')
+
+    this%t_2m3650(begp:endp)  = spval
+    call hist_addfld1d (fname='T2M3650', units='K',  &
+         avgflag='A', long_name='air temperature (last 10yrs)', &
+         ptr_patch=this%t_2m3650, default='inactive')
 
     if (crop_prog) then
        this%gdd0(begp:endp) = spval
@@ -1441,6 +1450,11 @@ module VegetationDataType
          desc='240hr average of vegetation temperature',  accum_type='runmean', accum_period=-10,  &
          subgrid_type='pft', numlev=1, init_value=0._r8)
 
+    this%t_2m3650(bounds%begp:bounds%endp) = spval
+    call init_accum_field (name='T_2M3650', units='K',                                              &
+         desc='10-year average of 2m temperature',  accum_type='runmean', accum_period=-3650,  &
+         subgrid_type='pft', numlev=1, init_value=0._r8)
+
     if ( crop_prog )then
        call init_accum_field (name='TDM10', units='K', &
             desc='10-day running mean of min 2-m temperature', accum_type='runmean', accum_period=-10, &
@@ -1512,6 +1526,9 @@ module VegetationDataType
 
     call extract_accum_field ('T_VEG240', rbufslp, nstep)
     this%t_veg240(begp:endp) = rbufslp(begp:endp)
+
+    call extract_accum_field ('T_2M3650', rbufslp, nstep)
+    this%t_2m3650(begp:endp) = rbufslp(begp:endp)
 
     if (crop_prog) then
        call extract_accum_field ('TDM10', rbufslp, nstep)
@@ -1608,6 +1625,12 @@ module VegetationDataType
     call update_accum_field  ('T_VEG240', rbufslp       , nstep)
     call extract_accum_field ('T_VEG240', this%t_veg240 , nstep)
 
+    ! fill the temporary variable
+    do p = begp,endp
+       rbufslp(p) = this%t_ref2m(p)
+    end do
+    call update_accum_field  ('T_2M3650', rbufslp       , nstep)
+    call extract_accum_field ('T_2M3650', this%t_2m3650, nstep)
 
     ! Accumulate and extract TREFAV - hourly average 2m air temperature
     ! Used to compute maximum and minimum of hourly averaged 2m reference
@@ -1792,6 +1815,8 @@ module VegetationDataType
     allocate(this%begwb               (begp:endp))          ; this%begwb             (:) = spval
     allocate(this%endwb               (begp:endp))          ; this%endwb             (:) = spval
     allocate(this%errh2o              (begp:endp))          ; this%errh2o            (:) = spval
+    allocate(this%h2o_moss_wc         (begp:endp))          ; this%h2o_moss_wc       (:) = spval
+    allocate(this%h2o_moss_inter      (begp:endp))          ; this%h2o_moss_inter    (:) = spval
 
     !-----------------------------------------------------------------------
     ! initialize history fields for select members of veg_ws
@@ -1838,6 +1863,11 @@ module VegetationDataType
        call hist_addfld1d (fname='FDRY', units='proportion', &
             avgflag='A', long_name='fraction of foliage that is green and dry', &
             ptr_patch=this%fdry, default='inactive')
+
+       this%h2o_moss_wc(begp:endp) = spval
+       call hist_addfld1d (fname='H2O_MOSS_WC', units='proportion', &
+            avgflag='A', long_name='Relative water content of Moss', &
+            ptr_patch=this%h2o_moss_wc)
     end if
 
     !-----------------------------------------------------------------------
