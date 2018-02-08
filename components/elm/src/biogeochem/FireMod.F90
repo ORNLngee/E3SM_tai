@@ -126,7 +126,7 @@ contains
     use elm_varcon           , only: secspday, spval
     use elm_varctl           , only: use_nofire, spinup_state, spinup_mortality_factor
     use dynSubgridControlMod , only: run_has_transient_landcover
-    use pftvarcon            , only: nc4_grass, nc3crop, ndllf_evr_tmp_tree
+    use pftvarcon            , only: ngraminoid, nc3crop, ndllf_evr_tmp_tree
     use pftvarcon            , only: nbrdlf_evr_trp_tree, nbrdlf_dcd_trp_tree, nbrdlf_evr_shrub
     !
     ! !ARGUMENTS:
@@ -305,11 +305,12 @@ contains
            if (pi <=  col_pp%npfts(c)) then
               p = col_pp%pfti(c) + pi - 1
               ! For crop veg types
-              if( veg_pp%itype(p) > nc4_grass )then
+              if( veg_pp%itype(p) > ngraminoid )then
                  cropf_col(c) = cropf_col(c) + veg_pp%wtcol(p)
               end if
               ! For natural vegetation (non-crop and non-bare-soil)
-              if( veg_pp%itype(p) >= ndllf_evr_tmp_tree .and. veg_pp%itype(p) <= nc4_grass )then
+              !if( veg_pp%itype(p) >= ndllf_evr_tmp_tree .and. veg_pp%itype(p) <= nc4_grass )then
+              if( veg_pp%itype(p) > noveg .and. veg_pp%itype(p) <= ngraminoid )then
                  lfwt(c) = lfwt(c) + veg_pp%wtcol(p)
               end if
            end if
@@ -331,7 +332,8 @@ contains
               ! column-level litter carbon
               ! is available, so we use leaf carbon to estimate the
               ! litter carbon for crop PFTs
-              if( veg_pp%itype(p) > nc4_grass .and. veg_pp%wtcol(p) > 0._r8 .and. leafc_col(c) > 0._r8 )then
+              !if( veg_pp%itype(p) > nc4_grass .and. veg_pp%wtcol(p) > 0._r8 .and. leafc_col(c) > 0._r8 )then
+              if( veg_pp%itype(p) > ngraminoid .and. veg_pp%wtcol(p) > 0._r8 .and. leafc_col(c) > 0._r8 )then
                  fuelc_crop(c)=fuelc_crop(c) + (leafc(p) + leafc_storage(p) + &
                       leafc_xfer(p))*veg_pp%wtcol(p)/cropf_col(c)     + &
                       totlitc(c)*leafc(p)/leafc_col(c)*veg_pp%wtcol(p)/cropf_col(c)
@@ -491,7 +493,7 @@ contains
            if (pi <=  col_pp%npfts(c)) then
               p = col_pp%pfti(c) + pi - 1
               ! For crop
-              if( forc_t(t)  >=  SHR_CONST_TKFRZ .and. veg_pp%itype(p)  >  nc4_grass .and.  &
+              if( forc_t(t)  >=  SHR_CONST_TKFRZ .and. veg_pp%itype(p)  >  ngraminoid .and.  &
                    kmo == abm_lf(c) .and. forc_rain(t)+forc_snow(t) == 0._r8  .and. &
                    burndate(p) >= 999 .and. veg_pp%wtcol(p)  >  0._r8 )then ! catch  crop burn time
 
@@ -980,6 +982,11 @@ contains
              f = 0._r8
            end if
         end if
+        ! (TODO) checking 'f' with regarding to unit.
+        ! Testing shows it's 1.0 when fire occurs.
+        ! This is NOT right if unit is 1/sec, and cause fire-c lost rate * dt over C state.
+        ! What need to check: fbac, farea_burned, baf_crops
+        f = f / dt
 
         ! apply this rate to the pft state variables to get flux rates
         ! biomass burning
@@ -1038,8 +1045,8 @@ contains
         m_livestemp_to_fire(p)           =  livestemp(p)          * f * cc_lstem(itype)
         m_livestemp_storage_to_fire(p)   =  livestemp_storage(p)  * f * cc_other_sc
         m_livestemp_xfer_to_fire(p)      =  livestemp_xfer(p)     * f * cc_other_sc
-        !m_deadstemp_to_fire(p)           =  deadstemp(p)          * m_veg * f * cc_dstem(itype)
-        m_deadstemp_to_fire(p)           =  deadstemp(p)          * f * cc_dstem(itype)
+        m_deadstemp_to_fire(p)           =  deadstemp(p)          * m_veg * f * cc_dstem(itype)
+        !m_deadstemp_to_fire(p)           =  deadstemp(p)          * f * cc_dstem(itype)  ! this is not consistent with fire loss of C (L1003) and N (L1026) as above
         m_deadstemp_storage_to_fire(p)   =  deadstemp_storage(p)  * f * cc_other_sc
         m_deadstemp_xfer_to_fire(p)      =  deadstemp_xfer(p)     * f * cc_other_sc
         m_frootp_to_fire(p)              =  frootp(p)             * f * 0._r8
@@ -1362,6 +1369,12 @@ contains
 
         baf_crop_sc = baf_crop(c)
         f = farea_burned(c)
+        ! (TODO) checking 'f' with regarding to unit.
+        ! Testing shows it's 1.0 when fire occurs.
+        ! This is NOT right if unit is 1/sec, and cause fire-c lost rate * dt over C state.
+        ! What need to check: fbac, farea_burned, baf_crops
+        baf_crop_sc = baf_crop_sc / dt
+        f = f / dt
 
         ! change CC for litter from 0.4_r8 to 0.5_r8 and CC for CWD from 0.2_r8
         ! to 0.25_r8 according to Li et al.(2014)

@@ -166,6 +166,8 @@ module elm_driver
   use elm_interface_funcsMod      , only : update_bgc_data_pf2elm, update_th_data_pf2elm
   use elm_interface_pflotranMod   , only : elm_pf_run, elm_pf_write_restart
   use elm_interface_pflotranMod   , only : elm_pf_finalize
+  ! alquimia via EMI
+  use elm_varctl            , only : use_alquimia
   !----------------------------------------------------------------------------
   use WaterBudgetMod              , only : WaterBudget_Reset, WaterBudget_Run, WaterBudget_Accum, WaterBudget_Print
   use WaterBudgetMod              , only : WaterBudget_SetBeginningMonthlyStates
@@ -766,7 +768,7 @@ contains
             filter(nc)%num_nolakeurbanp, filter(nc)%nolakeurbanp,                        &
             atm2lnd_vars, canopystate_vars, cnstate_vars, energyflux_vars,               &
             frictionvel_vars, soilstate_vars, solarabs_vars, surfalb_vars,               &
-            ch4_vars, photosyns_vars )
+            ch4_vars, photosyns_vars, soilhydrology_vars)
        call t_stopf('canflux')
 
        ! Fluxes for all urban landunits
@@ -1121,7 +1123,7 @@ contains
              if (use_fates_sp) then
                call SatellitePhenology(bounds_clump,               &
                filter_inactive_and_active(nc)%num_soilp, filter_inactive_and_active(nc)%soilp,    &
-               waterstate_vars, canopystate_vars)
+               waterstate_vars, canopystate_vars, soilstate_vars)
              endif
              
           else ! not ( if-use_cn   or if-use_fates)
@@ -1129,7 +1131,7 @@ contains
                 ! Prescribed biogeography - prescribed canopy structure, some prognostic carbon fluxes
                 call SatellitePhenology(bounds_clump,               &
                      filter(nc)%num_nolakep, filter(nc)%nolakep,    &
-                     waterstate_vars, canopystate_vars)
+                     waterstate_vars, canopystate_vars, soilstate_vars)
              end if
           end if  ! end of if-use_cn   or if-use_fates
        end if ! end of is_active_betr_bgc
@@ -1284,7 +1286,7 @@ contains
        if (use_cn .and. doalb) then
            call VegStructUpdate(filter(nc)%num_soilp, filter(nc)%soilp,   &
                 frictionvel_vars, cnstate_vars, &
-                canopystate_vars, crop_vars)
+                canopystate_vars, crop_vars, soilhydrology_vars)
        end if
 
 
