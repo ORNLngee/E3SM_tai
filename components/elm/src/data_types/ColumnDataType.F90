@@ -6105,7 +6105,7 @@ contains
          avgflag='A', long_name='sub-surface drainage', &
          ptr_col=this%qflx_drain, c2l_scale_type='urbanf')
 
-#if (defined HUM_HOL)
+#if (defined HUM_HOL || defined MARSH)
     this%qflx_lat_aqu(begc:endc) = spval
     call hist_addfld1d (fname='QFLX_LAT_AQU',  units='mm/s',  &
          avgflag='A', long_name='Lateral flow between hummock and hollow', &

@@ -1101,7 +1101,7 @@ contains
     if (.not. readv) rsub_top_globalmax = 10._r8
 
     !if ( .not. readv) call endrun(msg='ERROR:  error in reading in pft data'//errMsg(__FILE__,__LINE__))
-#if (defined HUM_HOL)
+#if (defined HUM_HOL || defined MARSH)
     call ncd_io('humhol_ht', humhol_ht, 'read', ncid, readvar=readv, posNOTonfile=.true.)
     if ( .not. readv) humhol_ht = 0.15_r8
     call ncd_io('humhol_dist', humhol_dist, 'read', ncid, readvar=readv, posNOTonfile=.true.)
@@ -1110,6 +1110,8 @@ contains
     if ( .not. readv) hum_frac = 0.5_r8
     call ncd_io('qflx_h2osfc_surfrate', qflx_h2osfc_surfrate, 'read', ncid, readvar=readv, posNOTonfile=.true.)
     if ( .not. readv) qflx_h2osfc_surfrate = 1.0e-7_r8
+#endif
+#if (defined HUM_HOL)
     call ncd_io('phen_a', phen_a, 'read', ncid, readvar=readv, posNOTonfile=.true.)
     if ( .not. readv) call endrun(msg='ERROR:  error in reading in pft data'//errMsg(__FILE__,__LINE__))
     call ncd_io('phen_b', phen_b, 'read', ncid, readvar=readv, posNOTonfile=.true.)
@@ -1142,6 +1144,39 @@ contains
     if ( .not. readv) call endrun(msg='ERROR:  error in reading in pft data'//errMsg(__FILE__,__LINE__))
     call ncd_io('crit_dayl', phen_crit_dayl, 'read', ncid, readvar=readv, posNOTonfile=.true.)
     if ( .not. readv) call endrun(msg='ERROR:  error in reading in pft ! data'//errMsg(__FILE__,__LINE__))
+#endif
+
+#if (defined MARSH)
+    ! Tidal cycle parameters
+    ! Defaults from Teri's hard coded numbers
+    ! Multiple parameters specified in params file like tide_coeff_amp_1, tide_coeff_amp_2, ...
+    call ncd_io('tide_baseline',tide_baseline, 'read', ncid, readvar=readv, posNOTonfile=.true.)
+    if (.not. readv) tide_baseline = 800.0_r8
+    do i=1,max_tide_coeffs
+      write(tempname,'(I0)') i
+      call ncd_io('tide_coeff_amp_'//trim(tempname),tide_coeff_amp(i), 'read', ncid, readvar=readv, posNOTonfile=.true.)
+      if (.not. readv) then
+         write(iulog,*) "Stopped looking for tidal components after not finding ",'tide_coeff_amp_'//trim(tempname)
+         num_tide_comps=i-1
+         exit
+      else
+         num_tide_comps=i
+      endif
+      call ncd_io('tide_coeff_period_'//trim(tempname),tide_coeff_period(i), 'read', ncid, readvar=readv, posNOTonfile=.true.)
+      if (.not. readv) call endrun(msg="Error: Must specify amp, period, and phase for each tide component: i = "//trim(tempname))
+      call ncd_io('tide_coeff_phase_'//trim(tempname),tide_coeff_phase(i), 'read', ncid, readvar=readv, posNOTonfile=.true.)
+      if (.not. readv) call endrun(msg="Error: Must specify amp, period, and phase for each tide component: i = "//trim(tempname))
+   enddo
+   if(num_tide_comps == 0) then
+      write(iulog,*) "No tidal coefficients found in parameter file. Using Teri's 2-component fit values for GCREW site as default"
+      num_tide_comps = 2
+      tide_coeff_amp(1) = 250.0_r8
+      tide_coeff_amp(2) = 1.0/0.91518
+      tide_coeff_period(1) = 1.0/0.00003
+      tide_coeff_period(2) = 1.0/0.00000001
+      tide_coeff_phase(1) = 513.4328
+      tide_coeff_phase(2) = 0.0
+   endif
 #endif
 
     call ncd_io('fnr', fnr, 'read', ncid, readvar=readv, posNOTonfile=.true.)
