@@ -606,6 +606,7 @@ contains
          dqodw1(c,j) = -(-hk(c,j)*dsmpdw(c,j)   + num*dhkdw(c,j))/den
          dqodw2(c,j) = -( hk(c,j)*dsmpdw(c,j+1) + num*dhkdw(c,j))/den
          rmx(c,j) =  qin(c,j) - qout(c,j) - qflx_rootsoi_col(c,j)
+
 #if (defined HUM_HOL)
          if (j == jwt(c)+1) then !water table in this layer
            rmx(c,j) =  qin(c,j) - qout(c,j) - qflx_rootsoi_col(c,j) - qflx_tran_veg_col_sat(c)
@@ -613,6 +614,7 @@ contains
            rmx(c,j) =  qin(c,j) - qout(c,j) - qflx_rootsoi_col(c,j)
          end if
 #endif
+
          amx(c,j) =  0._r8
          bmx(c,j) =  dzmm(c,j)*(sdamp+1._r8/dtime) + dqodw1(c,j)
          cmx(c,j) =  dqodw2(c,j)
@@ -646,6 +648,8 @@ contains
               rmx(c,j)    =  qin(c,j) - qout(c,j) - qflx_rootsoi_col(c,j)
             end if
 #endif
+
+
             amx(c,j)    = -dqidw0(c,j)
             bmx(c,j)    =  dzmm(c,j)/dtime - dqidw1(c,j) + dqodw1(c,j)
             cmx(c,j)    =  dqodw2(c,j)
