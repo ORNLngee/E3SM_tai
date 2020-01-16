@@ -707,10 +707,6 @@ contains
     waterlevel_opt(:) = 0.0_r8
     waterlevel_tol(:) = 50.0_r8
 
-    sal_threshold(:) = 50.0e6_r8 ! Very high value to effectively turn off if unset
-    sal_opt(:) = 0.0_r8
-    sal_tol(:) = 50.0_r8
-
     ! Set specific vegetation type values
 
     if (masterproc) then
@@ -1129,18 +1125,18 @@ contains
 
    ! salinity parameters
    call ncd_io('sal_threshold', sal_threshold(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-   if ( .not. readv ) sal_threshold(0:npft-1) = 50.0_r8 !placeholder value for now-update with more accurate -SLL
+   if ( .not. readv ) sal_threshold(:) = 50.0_r8 !placeholder value for now-update with more accurate -SLL
    call ncd_io('sal_opt', sal_opt(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-   if ( .not. readv ) sal_opt(0:npft-1) = 0.0_r8
+   if ( .not. readv ) sal_opt(:) = 0.0_r8 
    call ncd_io('sal_tol', sal_tol(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-   if ( .not. readv ) sal_tol(0:npft-1) = 50.0_r8
+   if ( .not. readv ) sal_tol(:) = 50.0_r8 
 
    call ncd_io('waterlevel_threshold', waterlevel_threshold(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-   if ( .not. readv ) waterlevel_threshold(0:npft-1) = 5000000.0_r8 ! Default turned off with very deep surface water
+   if ( .not. readv ) waterlevel_threshold(:) = 5000000.0_r8 ! Default turned off with very deep surface water
    call ncd_io('waterlevel_opt', waterlevel_opt(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-   if ( .not. readv ) waterlevel_opt(0:npft-1) = 0.0_r8
+   if ( .not. readv ) waterlevel_opt(:) = 0.0_r8 
    call ncd_io('waterlevel_tol', waterlevel_tol(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-   if ( .not. readv ) waterlevel_tol(0:npft-1) = 50.0_r8
+   if ( .not. readv ) waterlevel_tol(:) = 50.0_r8 
 #endif
 
     call ncd_io('phen_a', phen_a, 'read', ncid, readvar=readv, posNOTonfile=.true.)
@@ -1218,25 +1214,25 @@ contains
     call ncd_io('nstor', nstor(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
     if ( .not. readv) call endrun(msg='ERROR:  error in reading in pft data'//errMsg(__FILE__,__LINE__))
     call ncd_io('br_xr', br_xr(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-    if (.not. readv) br_xr(0:npft-1) = 0._r8
-    call ncd_io('crit_gdd1', crit_gdd1(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-    if (.not. readv) crit_gdd1(0:npft-1) = 4.8_r8
-    call ncd_io('crit_gdd2', crit_gdd2(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-    if (.not. readv) crit_gdd2(0:npft-1) = 0.13_r8
+    if (.not. readv) br_xr(:) = 0._r8
+    call ncd_io('crit_gdd1', crit_gdd1, 'read', ncid, readvar=readv, posNOTonfile=.true.)
+    if (.not. readv) crit_gdd1(:) = 4.8_r8
+    call ncd_io('crit_gdd2', crit_gdd2, 'read', ncid, readvar=readv, posNOTonfile=.true.)
+    if (.not. readv) crit_gdd2(:) = 0.13_r8
     call ncd_io('tc_stress', tc_stress, 'read', ncid, readvar=readv, posNOTonfile=.true.)
     if ( .not. readv) call endrun(msg='ERROR:  error in reading in pft data'//errMsg(__FILE__,__LINE__))
-    call ncd_io('gcbc_p',gcbc_p(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-    if ( .not. readv ) gcbc_p(0:npft-1) = 0._r8
-    call ncd_io('gcbc_q',gcbc_q(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-    if ( .not. readv ) gcbc_q(0:npft-1) = 0._r8
-    call ncd_io('gcbr_p',gcbr_p(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-    if ( .not. readv ) gcbr_p(0:npft-1) = 0._r8
-    call ncd_io('gcbr_q',gcbr_q(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-    if ( .not. readv ) gcbr_q(0:npft-1) = 0._r8
+    call ncd_io('gcbc_p',gcbc_p, 'read', ncid, readvar=readv, posNOTonfile=.true.)
+    if ( .not. readv ) gcbc_p(:) = 0._r8
+    call ncd_io('gcbc_q',gcbc_q, 'read', ncid, readvar=readv, posNOTonfile=.true.)
+    if ( .not. readv ) gcbc_q(:) = 0._r8
+    call ncd_io('gcbr_p',gcbr_p, 'read', ncid, readvar=readv, posNOTonfile=.true.)
+    if ( .not. readv ) gcbr_p(:) = 0._r8
+    call ncd_io('gcbr_q',gcbr_q, 'read', ncid, readvar=readv, posNOTonfile=.true.)
+    if ( .not. readv ) gcbr_q(:) = 0._r8
     call ncd_io('gcpsi',gcpsi(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-    if ( .not. readv ) gcpsi(0:npft-1) = 0._r8
+    if ( .not. readv ) gcpsi(:) = 0._r8
     call ncd_io('pftcc',pftcc(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-    if ( .not. readv ) pftcc(0:npft-1) = 1._r8
+    if ( .not. readv ) pftcc(:) = 1._r8
        
     call ncd_io('mergetoelmpft', mergetoelmpft(0:npft-1), 'read', ncid, readvar=readv)
     if ( .not. readv ) then
