@@ -72,6 +72,7 @@ contains
          water_density                 => col_chem%water_density                 , &
          aqueous_pressure              => col_chem%aqueous_pressure              , &
          total_mobile                  => col_chem%total_mobile                  , &
+         free_mobile                   => col_chem%free_mobile                   , &
          total_immobile                => col_chem%total_immobile                , &
          mineral_volume_fraction       => col_chem%mineral_volume_fraction       , &
          mineral_specific_surface_area => col_chem%mineral_specific_surface_area , &
@@ -132,6 +133,17 @@ contains
                 do j = 1, nlevsoi
                    do k = 1, alquimia_num_primary
                       cur_data%data_real_3d(c,j,k) = total_mobile(c,j,k)
+                   enddo
+                enddo
+             enddo
+             cur_data%is_set = .true.
+
+            case (L2E_STATE_FREE_MOBILE)
+               do fc = 1, num_filter
+                  c = filter(fc)
+                  do j = 1, nlevsoi
+                     do k = 1, alquimia_num_primary
+                        cur_data%data_real_3d(c,j,k) = free_mobile(c,j,k)
                    enddo
                 enddo
              enddo
@@ -262,11 +274,15 @@ contains
          soil_salinity                 => col_chem%soil_salinity                 , &
          soil_O2                       => col_chem%soil_O2                       , &
          soil_sulfate                  => col_chem%soil_sulfate                  , &
+         soil_sulfide                  => col_chem%soil_sulfide                  , &
          soil_Fe2                      => col_chem%soil_Fe2                      , &
          soil_FeOxide                  => col_chem%soil_FeOxide                  , &
+         soil_FeS                      => col_chem%soil_FeS                      , &
+         soil_acetate                  => col_chem%soil_acetate                  , &
          water_density                 => col_chem%water_density                 , &
          aqueous_pressure              => col_chem%aqueous_pressure              , &
          total_mobile                  => col_chem%total_mobile                  , &
+         free_mobile                   => col_chem%free_mobile                   , &
          total_immobile                => col_chem%total_immobile                , &
          mineral_volume_fraction       => col_chem%mineral_volume_fraction       , &
          mineral_specific_surface_area => col_chem%mineral_specific_surface_area , &
@@ -331,6 +347,15 @@ contains
              enddo
              cur_data%is_set = .true.
 
+          case (E2L_STATE_SOIL_SULFIDE)
+             do fc = 1, num_filter
+                c = filter(fc)
+                do j = 1, nlevsoi
+                   soil_sulfide(c,j) = cur_data%data_real_2d(c,j)
+                enddo
+             enddo
+             cur_data%is_set = .true.
+
           case (E2L_STATE_SOIL_FE2)
              do fc = 1, num_filter
                 c = filter(fc)
@@ -345,6 +370,24 @@ contains
                 c = filter(fc)
                 do j = 1, nlevsoi
                    soil_FeOxide(c,j) = cur_data%data_real_2d(c,j)
+                enddo
+             enddo
+             cur_data%is_set = .true.
+
+          case (E2L_STATE_SOIL_FE_SULFIDE)
+             do fc = 1, num_filter
+                c = filter(fc)
+                do j = 1, nlevsoi
+                   soil_FeS(c,j) = cur_data%data_real_2d(c,j)
+                enddo
+             enddo
+             cur_data%is_set = .true.
+
+          case (E2L_STATE_SOIL_ACETATE)
+             do fc = 1, num_filter
+                c = filter(fc)
+                do j = 1, nlevsoi
+                   soil_acetate(c,j) = cur_data%data_real_2d(c,j)
                 enddo
              enddo
              cur_data%is_set = .true.
@@ -373,6 +416,17 @@ contains
                 do j = 1, nlevsoi
                    do k = 1, alquimia_num_primary
                       total_mobile(c,j,k) = cur_data%data_real_3d(c,j,k)
+                   enddo
+                enddo
+             enddo
+             cur_data%is_set = .true.
+
+            case (E2L_STATE_FREE_MOBILE)
+               do fc = 1, num_filter
+                  c = filter(fc)
+                  do j = 1, nlevsoi
+                     do k = 1, alquimia_num_primary
+                        free_mobile(c,j,k) = cur_data%data_real_3d(c,j,k)
                    enddo
                 enddo
              enddo

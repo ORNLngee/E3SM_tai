@@ -39,7 +39,7 @@ contains
     character (len=32) , intent(out) :: dim3_end_name
     character (len=32) , intent(out) :: dim4_beg_name
     character (len=32) , intent(out) :: dim4_end_name
-    logical            , intent(out) :: data_found
+    logical            , intent(inout) :: data_found
 
     is_int_type    = .false.
     is_real_type   = .false.
@@ -199,6 +199,28 @@ contains
        id_val         =  E2L_FLUX_DON_RUNOFF
        name_val       =  'DON runoff'
        long_name_val  =  'DON runoff: EM to ELM'
+       units_val      =  '[gN/m2/s]'
+       is_real_type   =  .true.
+       ndim           =  1
+       dim1_beg_name  =  dimname_begc
+       dim1_end_name  =  dimname_endc
+       data_found   =  .true.
+
+    case(E2L_FLUX_N2O)
+       id_val         =  E2L_FLUX_N2O
+       name_val       =  'N2O flux'
+       long_name_val  =  'N2O flux: EM to ELM'
+       units_val      =  '[gN/m2/s]'
+       is_real_type   =  .true.
+       ndim           =  1
+       dim1_beg_name  =  dimname_begc
+       dim1_end_name  =  dimname_endc
+       data_found   =  .true.
+
+    case(E2L_FLUX_N2)
+       id_val         =  E2L_FLUX_N2
+       name_val       =  'N2 flux'
+       long_name_val  =  'N2 flux: EM to ELM'
        units_val      =  '[gN/m2/s]'
        is_real_type   =  .true.
        ndim           =  1

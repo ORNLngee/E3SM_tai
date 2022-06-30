@@ -18,6 +18,7 @@ module pftvarcon
   !----------------------F.-M. Yuan: 2018-03-23---------------------------------------------------------------------
   use elm_varpar  , only : maxpatch_pft, natpft_lb, natpft_ub, crop_prog
   use elm_varpar  , only : numpft, numcft, natpft_size, cft_size, max_patch_per_col, maxpatch_urb
+  use elm_varpar  , only : surfpft_size, surfpft_lb, surfpft_ub
   use elm_varctl  , only : create_crop_landunit
   !----------------------F.-M. Yuan: 2018-03-23---------------------------------------------------------------------
   !
@@ -331,11 +332,12 @@ module pftvarcon
   real(r8)              :: sfcflow_ratescale         ! Rate scale for surface water flow across columns (s-1)
  ! parameters for salinity response function
   real(r8), allocatable :: sal_threshold(:) !threshold for salinity effects (ppt)
-  real(r8), allocatable :: KM_salinity(:)    !half saturation constant for omotic inhibition function (ppt)
-  real(r8), allocatable :: osm_inhib(:)      !osmotic inhibition factor
   real(r8), allocatable :: sal_opt(:)        !Salinity at which optimal biomass occurs (ppt)
   real(r8), allocatable :: sal_tol(:)        !Salinity tolerance; width parameter for Gaussian distribution (ppt -1)
-  real(r8), allocatable :: floodf(:)         !flood factor, inhibit growth due to inundation
+
+  real(r8), allocatable :: waterlevel_threshold(:)  !threshold for water level effects (mm above surface)
+  real(r8), allocatable :: waterlevel_opt(:)        !Water level at which optimal biomass occurs (mm)
+  real(r8), allocatable :: waterlevel_tol(:)        !Water level tolerance; width parameter for Gaussian distribution (mm -1)
 
   !endif
   !phenology
@@ -671,6 +673,8 @@ contains
     allocate( gcbc_q             (0:mxpft) )
     allocate( gcbr_p             (0:mxpft) )
     allocate( gcbr_q             (0:mxpft) )
+    allocate( gcpsi              (0:mxpft) )
+    allocate( pftcc              (0:mxpft) )
 
 
     ! Tidal cycle coefficients
@@ -691,19 +695,21 @@ contains
     
     ! salinity parameters
     allocate( sal_threshold (0:mxpft) )
-    allocate( KM_salinity (0:mxpft) )
-    allocate( osm_inhib (0:mxpft) )
     allocate( sal_opt (0:mxpft) )
     allocate( sal_tol (0:mxpft) )
-    allocate( floodf (0:mxpft) )
+
+    allocate( waterlevel_threshold (0:mxpft) )
+    allocate( waterlevel_opt (0:mxpft) )
+    allocate( waterlevel_tol (0:mxpft) )
 
     ! Make sure they are initialized to some values
-    sal_threshold(:) = 50.0_r8
-    KM_salinity(:) = 1.0_r8
-    osm_inhib(:) = 1.8_r8
+    waterlevel_threshold(:) = 50.0e6_r8 ! Very high value to effectively turn off if unset
+    waterlevel_opt(:) = 0.0_r8
+    waterlevel_tol(:) = 50.0_r8
+
+    sal_threshold(:) = 50.0e6_r8 ! Very high value to effectively turn off if unset
     sal_opt(:) = 0.0_r8
     sal_tol(:) = 50.0_r8
-    floodf(:) = 1.0_r8
 
     ! Set specific vegetation type values
 
@@ -1095,12 +1101,12 @@ contains
     ! Defaults from Teri's hard coded numbers
     ! Multiple parameters specified in params file like tide_coeff_amp_1, tide_coeff_amp_2, ...
     call ncd_io('tide_baseline',tide_baseline, 'read', ncid, readvar=readv, posNOTonfile=.true.)
-    if (.not. readv) tide_baseline = 800.0_r8
+    if (.not. readv) tide_baseline = 0.0_r8
     do i=1,max_tide_coeffs
       write(tempname,'(I0)') i
       call ncd_io('tide_coeff_amp_'//trim(tempname),tide_coeff_amp(i), 'read', ncid, readvar=readv, posNOTonfile=.true.)
       if (.not. readv) then
-         write(iulog,*) "Stopped looking for tidal components after not finding ",'tide_coeff_amp_'//trim(tempname)
+         ! write(iulog,*) "Stopped looking for tidal components after not finding ",'tide_coeff_amp_'//trim(tempname)
          num_tide_comps=i-1
          exit
       else
@@ -1112,31 +1118,29 @@ contains
       if (.not. readv) call endrun(msg="Error: Must specify amp, period, and phase for each tide component: i = "//trim(tempname))
    enddo
    if(num_tide_comps == 0) then
-      write(iulog,*) "No tidal coefficients found in parameter file. Using Teri's 2-component fit values for GCREW site as default"
-      num_tide_comps = 2
-      tide_coeff_amp(1) = 250.0_r8
-      tide_coeff_amp(2) = 1.0/0.91518
+      ! write(iulog,*) "No tidal coefficients found in parameter file. Using Teri's 2-component fit values for GCREW site as default"
+      num_tide_comps = 1
+      tide_coeff_amp(1) = 0.0_r8
       tide_coeff_period(1) = 1.0/0.00003
-      tide_coeff_period(2) = 1.0/0.00000001
-      tide_coeff_phase(1) = 513.4328
-      tide_coeff_phase(2) = 0.0
+      tide_coeff_phase(1) = 0.0
    endif
    call ncd_io('sfcflow_ratescale',sfcflow_ratescale, 'read', ncid, readvar=readv, posNOTonfile=.true.)
    if (.not. readv) sfcflow_ratescale = 7.0e-5_r8 ! Probably better to have default be zero for safety
 
    ! salinity parameters
    call ncd_io('sal_threshold', sal_threshold(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-   if ( .not. readv ) sal_threshold(:) = 50.0_r8 !placeholder value for now-update with more accurate -SLL
-   call ncd_io('KM_salinity', KM_salinity(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-   if ( .not. readv ) KM_salinity(:) = 1.0_r8 !placeholder value for now-update with more accurate -SLL
-   call ncd_io('osm_inhib', osm_inhib(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-   if ( .not. readv ) osm_inhib(:) = 1.0_r8 
+   if ( .not. readv ) sal_threshold(0:npft-1) = 50.0_r8 !placeholder value for now-update with more accurate -SLL
    call ncd_io('sal_opt', sal_opt(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-   if ( .not. readv ) sal_opt(:) = 0.0_r8 
+   if ( .not. readv ) sal_opt(0:npft-1) = 0.0_r8
    call ncd_io('sal_tol', sal_tol(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-   if ( .not. readv ) sal_tol(:) = 50.0_r8 
-   call ncd_io('floodf', floodf(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-   if ( .not. readv ) floodf(:) = 1.0_r8 
+   if ( .not. readv ) sal_tol(0:npft-1) = 50.0_r8
+
+   call ncd_io('waterlevel_threshold', waterlevel_threshold(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
+   if ( .not. readv ) waterlevel_threshold(0:npft-1) = 5000000.0_r8 ! Default turned off with very deep surface water
+   call ncd_io('waterlevel_opt', waterlevel_opt(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
+   if ( .not. readv ) waterlevel_opt(0:npft-1) = 0.0_r8
+   call ncd_io('waterlevel_tol', waterlevel_tol(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
+   if ( .not. readv ) waterlevel_tol(0:npft-1) = 50.0_r8
 #endif
 
     call ncd_io('phen_a', phen_a, 'read', ncid, readvar=readv, posNOTonfile=.true.)
@@ -1214,25 +1218,25 @@ contains
     call ncd_io('nstor', nstor(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
     if ( .not. readv) call endrun(msg='ERROR:  error in reading in pft data'//errMsg(__FILE__,__LINE__))
     call ncd_io('br_xr', br_xr(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-    if (.not. readv) br_xr(:) = 0._r8
-    call ncd_io('crit_gdd1', crit_gdd1, 'read', ncid, readvar=readv, posNOTonfile=.true.)
-    if (.not. readv) crit_gdd1(:) = 4.8_r8
-    call ncd_io('crit_gdd2', crit_gdd2, 'read', ncid, readvar=readv, posNOTonfile=.true.)
-    if (.not. readv) crit_gdd2(:) = 0.13_r8
+    if (.not. readv) br_xr(0:npft-1) = 0._r8
+    call ncd_io('crit_gdd1', crit_gdd1(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
+    if (.not. readv) crit_gdd1(0:npft-1) = 4.8_r8
+    call ncd_io('crit_gdd2', crit_gdd2(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
+    if (.not. readv) crit_gdd2(0:npft-1) = 0.13_r8
     call ncd_io('tc_stress', tc_stress, 'read', ncid, readvar=readv, posNOTonfile=.true.)
     if ( .not. readv) call endrun(msg='ERROR:  error in reading in pft data'//errMsg(__FILE__,__LINE__))
-    call ncd_io('gcbc_p',gcbc_p, 'read', ncid, readvar=readv, posNOTonfile=.true.)
-    if ( .not. readv ) gcbc_p(:) = 0._r8
-    call ncd_io('gcbc_q',gcbc_q, 'read', ncid, readvar=readv, posNOTonfile=.true.)
-    if ( .not. readv ) gcbc_q(:) = 0._r8
-    call ncd_io('gcbr_p',gcbr_p, 'read', ncid, readvar=readv, posNOTonfile=.true.)
-    if ( .not. readv ) gcbr_p(:) = 0._r8
-    call ncd_io('gcbr_q',gcbr_q, 'read', ncid, readvar=readv, posNOTonfile=.true.)
-    if ( .not. readv ) gcbr_q(:) = 0._r8
+    call ncd_io('gcbc_p',gcbc_p(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
+    if ( .not. readv ) gcbc_p(0:npft-1) = 0._r8
+    call ncd_io('gcbc_q',gcbc_q(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
+    if ( .not. readv ) gcbc_q(0:npft-1) = 0._r8
+    call ncd_io('gcbr_p',gcbr_p(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
+    if ( .not. readv ) gcbr_p(0:npft-1) = 0._r8
+    call ncd_io('gcbr_q',gcbr_q(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
+    if ( .not. readv ) gcbr_q(0:npft-1) = 0._r8
     call ncd_io('gcpsi',gcpsi(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-    if ( .not. readv ) gcpsi(:) = 0._r8
+    if ( .not. readv ) gcpsi(0:npft-1) = 0._r8
     call ncd_io('pftcc',pftcc(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-    if ( .not. readv ) pftcc(:) = 1._r8
+    if ( .not. readv ) pftcc(0:npft-1) = 1._r8
        
     call ncd_io('mergetoelmpft', mergetoelmpft(0:npft-1), 'read', ncid, readvar=readv)
     if ( .not. readv ) then
@@ -1402,6 +1406,7 @@ contains
 
        ! MUST re-do some constants which already set in 'clm_varpar.F90:clm_varpar_init()'
        numpft       = npft - 1                   ! actual # of patches (without bare)
+       mxpft_nc     = numpft                     ! user-defined is what max.
        if (npcropmin < npft) then
           numcft    = npcropmax - npcropmin + 1  ! actual # of crops
           crop_prog = .true.                     ! If prognostic crops is turned on
@@ -1421,6 +1426,10 @@ contains
        natpft_ub = natpft_lb + natpft_size - 1
        cft_lb = natpft_ub + 1
        cft_ub = max(cft_lb, cft_lb + cft_size - 1)            ! NOTE: if cft_size is ZERO, could be issue (but so far so good)
+       ! surfdata pft size must be same as physiology's natpft number
+       surfpft_lb  = natpft_lb
+       surfpft_ub  = natpft_ub
+       surfpft_size = natpft_size
 
        max_patch_per_col= max(numpft+1, numcft, maxpatch_urb)
 

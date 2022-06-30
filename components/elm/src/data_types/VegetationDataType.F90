@@ -386,6 +386,9 @@ module VegetationDataType
     real(r8), pointer :: qflx_over_supply_patch   (:)   => null()   ! over supplied irrigation
     integer , pointer :: n_irrig_steps_left (:)   => null() ! number of time steps for which we still need to irrigate today (if 0, ignore)
 
+    real(r8), pointer :: osm_inhib               (:)   => null() ! Osmotic inhibition of root water uptake
+    real(r8), pointer :: floodf                  (:)   => null() ! Inundation inhibition of root water uptake
+
   contains
     procedure, public :: Init    => veg_wf_init
     procedure, public :: Restart => veg_wf_restart
@@ -1979,7 +1982,6 @@ module VegetationDataType
        allocate(this%grainc_xfer        (begp :endp))   ;  this%grainc_xfer        (:)   = spval
        allocate(this%woodc              (begp :endp))   ;  this%woodc              (:)   = spval
        allocate(this%totvegc_abg        (begp :endp))   ;  this%totvegc_abg        (:)   = spval
-       allocate(this%osm_inhib          (begp :endp))   ;  this%osm_inhib          (:)   = spval
     endif  !  not use_fates
 
     allocate(this%begcb              (begp :endp))   ;  this%begcb              (:) = spval
@@ -2500,7 +2502,7 @@ module VegetationDataType
              this%livestemc_storage(p) = 0._r8
              this%livestemc_xfer(p)    = 0._r8
 
-             if (veg_vp%woody(veg_pp%itype(p)) == 1._r8) then
+             if (veg_vp%woody(veg_pp%itype(p)) >= 1._r8) then
                 this%deadstemc(p) = 0.1_r8 * ratio
              else
                 this%deadstemc(p) = 0._r8
@@ -3972,7 +3974,7 @@ module VegetationDataType
           ! tree types need to be initialized with some stem mass so that
           ! roughness length is not zero in canopy flux calculation
 
-          if (veg_vp%woody(veg_pp%itype(p)) == 1._r8) then
+          if (veg_vp%woody(veg_pp%itype(p)) >= 1._r8) then
              this%deadstemn(p) = veg_cs%deadstemc(p) / veg_vp%deadwdcn(veg_pp%itype(p))
           else
              this%deadstemn(p) = 0._r8
@@ -4652,7 +4654,7 @@ module VegetationDataType
           ! tree types need to be initialized with some stem mass so that
           ! roughness length is not zero in canopy flux calculation
 
-          if (veg_vp%woody(veg_pp%itype(p)) == 1._r8) then
+          if (veg_vp%woody(veg_pp%itype(p)) >= 1._r8) then
              this%deadstemp(p) = veg_cs%deadstemc(p) / veg_vp%deadwdcp(veg_pp%itype(p))
           else
              this%deadstemp(p) = 0._r8
@@ -5458,6 +5460,9 @@ module VegetationDataType
     allocate(this%qflx_over_supply_patch   (begp:endp))              ; this%qflx_over_supply_patch   (:)   = spval
     allocate(this%n_irrig_steps_left       (begp:endp))              ; this%n_irrig_steps_left       (:)   = 0
 
+    allocate(this%osm_inhib                (begp:endp))              ; this%osm_inhib                (:)   = spval
+    allocate(this%floodf                   (begp:endp))              ; this%floodf                   (:)   = spval
+
     !-----------------------------------------------------------------------
     ! initialize history fields for select members of veg_wf
     !-----------------------------------------------------------------------
@@ -5577,6 +5582,16 @@ module VegetationDataType
             avgflag='A', long_name='surface dew added to snow pacK', &
             ptr_patch=this%qflx_dew_snow, default='inactive', c2l_scale_type='urbanf')
     end if
+
+    this%osm_inhib(begp:endp) = spval
+    call hist_addfld1d (fname='OSM_INHIB', units='-',  &
+         avgflag='A', long_name='Osmotic inhibition of root water uptake', &
+         ptr_patch=this%osm_inhib, set_lake=0._r8, c2l_scale_type='urbanf')
+
+     this%floodf(begp:endp) = spval
+     call hist_addfld1d (fname='FLOODF', units='-',  &
+         avgflag='A', long_name='Inundation inhibition of root water uptake', &
+         ptr_patch=this%floodf, set_lake=0._r8, c2l_scale_type='urbanf')
 
     !-----------------------------------------------------------------------
     ! set cold-start initial values for select members of veg_wf

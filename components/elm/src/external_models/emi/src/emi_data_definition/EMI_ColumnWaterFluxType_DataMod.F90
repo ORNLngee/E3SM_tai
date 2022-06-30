@@ -39,7 +39,7 @@ contains
     character (len=32) , intent(out) :: dim3_end_name
     character (len=32) , intent(out) :: dim4_beg_name
     character (len=32) , intent(out) :: dim4_end_name
-    logical            , intent(out) :: data_found
+    logical            , intent(inout) :: data_found
 
     is_int_type    = .false.
     is_real_type   = .false.
@@ -72,6 +72,30 @@ contains
        name_val       =  'Lateral water flow'
        long_name_val  =  'Lateral water flow: ELM to EM'
        units_val      =  'mm H2O/s'
+       is_real_type   =  .true.
+       ndim           =  2
+       dim1_beg_name  =  dimname_begc
+       dim1_end_name  =  dimname_endc
+       dim2_beg_name  =  dimname_one
+       dim2_end_name  =  dimname_nlevgrnd
+       data_found   =  .true.
+
+    case(L2E_FLUX_SOIL_QFLX_DRAIN)
+       id_val         =  L2E_FLUX_SOIL_QFLX_DRAIN
+       name_val       =  'Subsurface drainage water flow'
+       long_name_val  =  'Subsurface drainage water flow: ELM to EM'
+       units_val      =  'mm H2O/s'
+       is_real_type   =  .true.
+       ndim           =  1
+       dim1_beg_name  =  dimname_begc
+       dim1_end_name  =  dimname_endc
+       data_found   =  .true.
+
+    case(L2E_FLUX_SOIL_QFLX_DRAIN_VR)
+       id_val         =  L2E_FLUX_SOIL_QFLX_DRAIN_VR
+       name_val       =  'Subsurface drainage water flow vr'
+       long_name_val  =  'Subsurface drainage water flow vr: ELM to EM'
+       units_val      =  'mm H2O/time step'
        is_real_type   =  .true.
        ndim           =  2
        dim1_beg_name  =  dimname_begc

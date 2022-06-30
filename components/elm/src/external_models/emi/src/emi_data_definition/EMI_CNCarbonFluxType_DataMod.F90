@@ -39,7 +39,7 @@ contains
     character (len=32) , intent(out) :: dim3_end_name
     character (len=32) , intent(out) :: dim4_beg_name
     character (len=32) , intent(out) :: dim4_end_name
-    logical            , intent(out) :: data_found
+    logical            , intent(inout) :: data_found
 
     is_int_type    = .false.
     is_real_type   = .false.
@@ -127,6 +127,17 @@ contains
 
     case(E2L_FLUX_HETEROTROPHIC_RESP)
        id_val         =  E2L_FLUX_HETEROTROPHIC_RESP
+       name_val       =  'hr'
+       long_name_val  =  'hr: EM to ELM'
+       units_val      =  '[gC/m2/s]'
+       is_real_type   =  .true.
+       ndim           =  1
+       dim1_beg_name  =  dimname_begc
+       dim1_end_name  =  dimname_endc
+       data_found   =  .true.
+
+    case(E2L_FLUX_METHANE)
+       id_val         =  E2L_FLUX_METHANE
        name_val       =  'hr'
        long_name_val  =  'hr: EM to ELM'
        units_val      =  '[gC/m2/s]'

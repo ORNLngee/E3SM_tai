@@ -43,6 +43,7 @@ contains
     use lnd_disagg_forc
     use lnd_downscale_atm_forcing
     use netcdf
+    use ncdio_pio        , only: ncd_pio_openfile,ncd_pio_closefile,ncd_inqdid,ncd_inqdlen,ncd_inqvid,ncd_io,file_desc_t, var_desc_t
     !
     ! !ARGUMENTS:
     type(bounds_type)  , intent(in)    :: bounds   ! bounds
@@ -104,7 +105,8 @@ contains
     integer :: sdate_addco2, sy_addco2, sm_addco2, sd_addco2
     character(len=200) metsource_str, thisline
     character(len=*), parameter :: sub = 'lnd_import_mct'
-    integer :: av, v, n, nummetdims, g3, gtoget, ztoget, line, mystart, tod_start, thistimelen  
+    integer :: av, v, n, nummetdims, g3, gtoget, ztoget, line, mystart, tod_start, thistimelen
+    integer :: ngrids_tide, ndims, dimids(2)
     character(len=20) aerovars(14), metvars(14)
     character(len=3) zst
     integer :: stream_year_first_lightng, stream_year_last_lightng, model_year_align_lightng
@@ -118,6 +120,10 @@ contains
     character(len=CL)  :: stream_fldFileName_popdens ! poplulation density stream filename
     character(len=CL)  :: stream_fldFileName_ndep    ! nitrogen deposition stream filename
     logical :: use_sitedata, has_zonefile, use_daymet, use_livneh
+    type(file_desc_t)  :: ncid_pio
+    type(var_desc_t)   :: vardesc
+    logical            :: dimexist,varexist,readvar
+
     data caldaym / 1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366 /    
 
     ! Constants to compute vapor pressure
@@ -1017,10 +1023,6 @@ contains
          sy_addt     = sdate_addt/10000
          sm_addt     = (sdate_addt-sy_addt*10000)/100
          sd_addt     = sdate_addt-sy_addt*10000-sm_addt*100
-         read(startdate_add_co2,*) sdate_addco2
-         sy_addco2     = sdate_addco2/10000
-         sm_addco2     = (sdate_addco2-sy_addco2*10000)/100
-         sd_addco2     = sdate_addco2-sy_addco2*10000-sm_addt*100
        end if 
        if (startdate_add_temperature .ne. '') then
          if ((yr == sy_addt .and. mon == sm_addt .and. day >= sd_addt) .or. &
@@ -1032,41 +1034,37 @@ contains
 
 
         !------------------------------------Tidal forcing--------------------------------------------------
-       if (atm2lnd_vars%loaded_bypassdata .eq. 0 ) then !.or. (mon .eq. 1 .and. day .eq. 1 .and. tod .eq. 0)) then ! Do on the first day of the year
-        if (masterproc .and. i .eq. 1) then  ! Only do it on one processor
-          ierr = nf90_open(trim(tide_file), nf90_nowrite, ncid)
-          if(ierr == 0) then
-            ! We can read the lenght of the array. Currently we might be wasting memory since the vars for holding the data were already allocated for 100 years
-            ierr = nf90_inq_dimid(ncid, 'time', dimid)
-            if(ierr .ne. 0) call endrun('Error finding time variable')
-            ierr = nf90_Inquire_Dimension(ncid, dimid, len = thistimelen)
-            if(ierr .ne. 0) call endrun('Error reading time variable')
-            write(iulog,*),'Reading tide forcing file. Found time dimension of length',thistimelen
-            if(thistimelen>876000) write(iulog,*), 'Warning: truncating tide forcing data length to 876000'
-            atm2lnd_vars%tide_forcing_len = min(thistimelen,876000)
-
-            ierr = nf90_inq_varid(ncid, 'tide_height',varid)
-            if(ierr .ne. 0) call endrun('Error finding tide_height variable')
-            ierr = nf90_get_var(ncid, varid, atm2lnd_vars%tide_height(1,1:atm2lnd_vars%tide_forcing_len),(/1,1/),(/1,atm2lnd_vars%tide_forcing_len/))
-            if(ierr .ne. 0) call endrun('Error reading tide_height variable')
-            ierr = nf90_inq_varid(ncid, 'tide_salinity',varid)
-            if(ierr .ne. 0) call endrun('Error finding tide_salinity variable')
-            ierr = nf90_get_var(ncid, varid, atm2lnd_vars%tide_salinity(1,1:atm2lnd_vars%tide_forcing_len),(/1,1/),(/1,atm2lnd_vars%tide_forcing_len/))
-            if(ierr .ne. 0) call endrun('Error reading tide_salinity variable')
-
-            ierr = nf90_close(ncid)
-            write(iulog,*) 'Reading tide height and salinity from file '//trim(tide_file)
-          else
-            if(tide_file .ne. ' ') write(iulog,*) 'Did not find tide forcing file '//trim(tide_file)
+       if (atm2lnd_vars%loaded_bypassdata .eq. 0) then !.or. (mon .eq. 1 .and. day .eq. 1 .and. tod .eq. 0)) then ! Do on the first day of the year
+        if(tide_file .eq. ' ') then
             atm2lnd_vars%tide_forcing_len = 1
+            ngrids_tide=ldomain%ns
+            allocate(atm2lnd_vars%tide_height(ldomain%ns,atm2lnd_vars%tide_forcing_len))
+            allocate(atm2lnd_vars%tide_salinity(ldomain%ns,atm2lnd_vars%tide_forcing_len))
+            allocate(atm2lnd_vars%tide_nitrate(ldomain%ns,atm2lnd_vars%tide_forcing_len))
             atm2lnd_vars%tide_height(:,:) = 0.0_r8
             atm2lnd_vars%tide_salinity(:,:) = 0.0_r8
-          endif
-        end if
-        if (i .eq. 1) then 
-           call mpi_bcast (atm2lnd_vars%tide_height, 876000, MPI_REAL8, 0, mpicom, ier)
-           call mpi_bcast (atm2lnd_vars%tide_salinity, 876000, MPI_REAL8, 0, mpicom, ier)
-        end if
+            atm2lnd_vars%tide_nitrate(:,:) = 0.0_r8
+        else
+          call ncd_pio_openfile (ncid_pio, trim(tide_file), 0)
+          call ncd_inqdid(ncid_pio,'time',dimid,dimexist)
+          if(.not. dimexist) call endrun('Error finding time variable')
+          call ncd_inqdlen(ncid_pio,dimid, len = thistimelen)
+          if(masterproc) write(iulog,*),'Reading tide forcing file. ',trim(tide_file),' Found time dimension of length',thistimelen
+          atm2lnd_vars%tide_forcing_len = thistimelen
+          
+          allocate(atm2lnd_vars%tide_height(ldomain%ns,atm2lnd_vars%tide_forcing_len))
+          allocate(atm2lnd_vars%tide_salinity(ldomain%ns,atm2lnd_vars%tide_forcing_len))
+          allocate(atm2lnd_vars%tide_nitrate(ldomain%ns,atm2lnd_vars%tide_forcing_len))
+          call ncd_io(ncid=ncid_pio,varname='tide_height',data=atm2lnd_vars%tide_height,flag='read',readvar=readvar)
+          if(.not. readvar) call endrun('Error reading tide_height variable')
+          call ncd_io(ncid=ncid_pio,varname='tide_nitrate',data=atm2lnd_vars%tide_nitrate,flag='read',readvar=readvar)
+          if(.not. readvar) call endrun('Error reading tide_nitrate variable')
+          call ncd_io(ncid=ncid_pio,varname='tide_salinity',data=atm2lnd_vars%tide_salinity,flag='read',readvar=readvar)
+          if(.not. readvar) call endrun('Error reading tide_salinity variable')
+
+          call ncd_pio_closefile(ncid_pio)
+
+        endif
       end if
 
        !set the topounit-level atmospheric state and flux forcings (bypass mode)
@@ -1117,6 +1115,71 @@ contains
                               top_af%solai(topo,2) + top_af%solai(topo,1)
        end do
      
+!---------------------------------- CO2 -------------------------------------------------------------------
+
+     if (co2_type_idx /= 0) then
+        !atmospheric CO2 (to be used for transient simulations only)
+        if (atm2lnd_vars%loaded_bypassdata .eq. 0) then
+          ierr = nf90_open(trim(co2_file), nf90_nowrite, ncid)
+          if (ierr .ne. 0) call endrun(msg=' ERROR: Failed to open cpl_bypass input CO2 file' )
+          ierr = nf90_inq_dimid(ncid, 'time', dimid)
+          ierr = nf90_Inquire_Dimension(ncid, dimid, len = thistimelen)
+          ierr = nf90_inq_varid(ncid, 'CO2', varid)
+          ierr = nf90_get_var(ncid, varid, atm2lnd_vars%co2_input(:,:,1:thistimelen))
+          ierr = nf90_inq_varid(ncid, 'C13O2', varid)
+          ierr = nf90_get_var(ncid, varid, atm2lnd_vars%c13o2_input(:,:,1:thistimelen))
+          ierr = nf90_close(ncid)
+        end if
+
+        !get weights/indices for interpolation (assume values represent annual averages)
+        nindex(1) = min(max(yr,1850),2100)-1764
+        if (thiscalday .le. 182.5) then
+          nindex(2) = nindex(1)-1
+        else
+          nindex(2) = nindex(1)+1
+        end if
+        wt1(1) = 1._r8 - abs((182.5 - (thiscalday -1._r8))/365._r8)
+        wt2(1) = 1._r8 - wt1(1)
+
+        co2_ppmv_val = atm2lnd_vars%co2_input(1,1,nindex(1))*wt1(1) + atm2lnd_vars%co2_input(1,1,nindex(2))*wt2(1)
+
+        if (startdate_add_co2 .ne. '') then
+          read(startdate_add_co2,*) sdate_addco2
+          sy_addco2     = sdate_addco2/10000
+          sm_addco2     = (sdate_addco2-sy_addco2*10000)/100
+          sd_addco2     = sdate_addco2-sy_addco2*10000-sm_addt*100
+          if ((yr == sy_addco2 .and. mon == sm_addco2 .and. day >= sd_addco2) .or. &
+              (yr == sy_addco2 .and. mon > sm_addco2) .or. (yr > sy_addco2)) then
+            co2_ppmv_val=co2_ppmv_val + add_co2
+          end if
+        end if
+
+        if (use_c13) then
+          atm2lnd_vars%forc_pc13o2_grc(g) = (atm2lnd_vars%c13o2_input(1,1,nindex(1))*wt1(1) + &
+             atm2lnd_vars%c13o2_input(1,1,nindex(2))*wt2(1)) * 1.e-6_r8 * atm2lnd_vars%forc_pbot_not_downscaled_grc(g)
+        end if
+        !TEST (FACE-like experiment begins in 2010)
+        !if (yr .ge. 2010) atm2lnd_vars%co2_input = 550.
+
+        ! bypass mode doesn't receive _prog/_diag from atm, but have to reset them here
+        co2_ppmv_prog = co2_ppmv_val
+        co2_ppmv_diag = co2_ppmv_val
+     else if (co2_type_idx == 0) then
+
+        ! CO2 constant, value from namelist
+        co2_ppmv_val = co2_ppmv
+        if (use_c13) then
+          atm2lnd_vars%forc_pc13o2_grc(g) = co2_ppmv_val * c13ratio * 1.e-6_r8 &
+                                           * atm2lnd_vars%forc_pbot_not_downscaled_grc(g)
+        end if
+
+     else
+
+        call endrun( sub//' ERROR: Invalid co2_type_idx, must be 0 or not (constant or diagnostic) for CPL_BYPASS' )
+
+     end if
+     !
+
   !-----------------------------------------------------------------------------------------------------
 #else
 
@@ -1217,11 +1280,12 @@ contains
                               top_af%solai(topo,2) + top_af%solai(topo,1)
          end do
        end if  
-#endif
 
        ! Determine optional receive fields
        ! CO2 (and C13O2) concentration: constant, prognostic, or diagnostic
        if (co2_type_idx == 0) then                    ! CO2 constant, value from namelist
+         co2_ppmv_val = co2_ppmv
+       elseif (co2_type_idx /= 0) then                  ! CO2 constant, value from namelist
          co2_ppmv_val = co2_ppmv
        else if (co2_type_idx == 1) then               ! CO2 prognostic, value from coupler field
          co2_ppmv_val = x2l(index_x2l_Sa_co2prog,i)
@@ -1230,6 +1294,21 @@ contains
        else
          call endrun( sub//' ERROR: Invalid co2_type_idx, must be 0, 1, or 2 (constant, prognostic, or diagnostic)' )
        end if
+
+      if (index_x2l_Sa_co2prog /= 0) then
+         co2_ppmv_prog = x2l(index_x2l_Sa_co2prog,i)   ! co2 atm state prognostic
+      else
+         co2_ppmv_prog = co2_ppmv
+      end if
+
+      if (index_x2l_Sa_co2diag /= 0) then
+         co2_ppmv_diag = x2l(index_x2l_Sa_co2diag,i)   ! co2 atm state diagnostic
+      else
+         co2_ppmv_diag = co2_ppmv
+      end if
+
+#endif
+
        ! Assign to topounits, with conversion from ppmv to partial pressure (Pa)
        ! If using C13, then get the c13ratio from elm_varcon (constant value for pre-industrial atmosphere)
 
@@ -1239,24 +1318,15 @@ contains
             top_as%pc13o2bot(topo) = top_as%pco2bot(topo) * c13ratio;
          end if
        end do
+       atm2lnd_vars%forc_pco2_grc(g)   = co2_ppmv_val * 1.e-6_r8 &
+                * atm2lnd_vars%forc_pbot_not_downscaled_grc(g)
+
        ! CH4
        if (index_x2l_Sa_methane /= 0) then
           do topo = grc_pp%topi(g), grc_pp%topf(g)
             top_as%pch4bot(topo) = x2l(index_x2l_Sa_methane,i)
           end do
        endif
-
-       if (index_x2l_Sa_co2prog /= 0) then
-          co2_ppmv_prog = x2l(index_x2l_Sa_co2prog,i)   ! co2 atm state prognostic
-       else
-          co2_ppmv_prog = co2_ppmv
-       end if
-
-       if (index_x2l_Sa_co2diag /= 0) then
-          co2_ppmv_diag = x2l(index_x2l_Sa_co2diag,i)   ! co2 atm state diagnostic
-       else
-          co2_ppmv_diag = co2_ppmv
-       end if
 
        if (index_x2l_Sa_methane /= 0) then
           atm2lnd_vars%forc_pch4_grc(g) = x2l(index_x2l_Sa_methane,i)
@@ -1296,55 +1366,13 @@ contains
        ! Note that the following does unit conversions from ppmv to partial pressures (Pa)
        ! Note that forc_pbot is in Pa
 
-#ifdef CPL_BYPASS
-       co2_type_idx = 2
-#endif
-
        if (co2_type_idx == 1) then
           co2_ppmv_val = co2_ppmv_prog
        else if (co2_type_idx == 2) then
-#ifdef CPL_BYPASS
-        !atmospheric CO2 (to be used for transient simulations only)
-        if (atm2lnd_vars%loaded_bypassdata .eq. 0) then 
-          ierr = nf90_open(trim(co2_file), nf90_nowrite, ncid)
-          ierr = nf90_inq_dimid(ncid, 'time', dimid)
-          ierr = nf90_Inquire_Dimension(ncid, dimid, len = thistimelen)
-          ierr = nf90_inq_varid(ncid, 'CO2', varid)
-          ierr = nf90_get_var(ncid, varid, atm2lnd_vars%co2_input(:,:,1:thistimelen))
-          ierr = nf90_inq_varid(ncid, 'C13O2', varid)
-          ierr = nf90_get_var(ncid, varid, atm2lnd_vars%c13o2_input(:,:,1:thistimelen))
-          ierr = nf90_close(ncid)
-        end if
-
-        !get weights/indices for interpolation (assume values represent annual averages)
-        nindex(1) = min(max(yr,1850),2006)-1764 !changed to 2050 from 2006 TAO 6/8/2018 changed back for test suite on 11/15/2018
-        if (thiscalday .le. 182.5) then 
-          nindex(2) = nindex(1)-1  
-        else
-          nindex(2) = nindex(1)+1
-        end if
-        wt1(1) = 1._r8 - abs((182.5 - (thiscalday -1._r8))/365._r8)
-        wt2(1) = 1._r8 - wt1(1)
-
-        co2_ppmv_val = atm2lnd_vars%co2_input(1,1,nindex(1))*wt1(1) + atm2lnd_vars%co2_input(1,1,nindex(2))*wt2(1)
-        if (startdate_add_co2 .ne. '') then
-          if ((yr == sy_addco2 .and. mon == sm_addco2 .and. day >= sd_addco2) .or. &
-              (yr == sy_addco2 .and. mon > sm_addco2) .or. (yr > sy_addco2)) then
-            co2_ppmv_val=co2_ppmv_val + add_co2
-          end if
-        end if
-
-        if (use_c13) then 
-          atm2lnd_vars%forc_pc13o2_grc(g) = (atm2lnd_vars%c13o2_input(1,1,nindex(1))*wt1(1) + &
-               atm2lnd_vars%c13o2_input(1,1,nindex(2))*wt2(1)) * 1.e-6_r8 * forc_pbot
-        end if
-        co2_type_idx = 1
-#else
           co2_ppmv_val = co2_ppmv_diag 
            if (use_c13) then
              atm2lnd_vars%forc_pc13o2_grc(g) = co2_ppmv_val * c13ratio * 1.e-6_r8 * forc_pbot
            end if
-#endif
        else
           co2_ppmv_val = co2_ppmv
           if (use_c13) then
@@ -1352,15 +1380,6 @@ contains
           end if
        end if
        atm2lnd_vars%forc_pco2_grc(g)   = co2_ppmv_val * 1.e-6_r8 * forc_pbot 
-
-#ifdef CPL_BYPASS
-       do topo = grc_pp%topi(g), grc_pp%topf(g)
-         top_as%pco2bot(topo) = atm2lnd_vars%forc_pco2_grc(g)
-         if (use_c13) then
-            top_as%pc13o2bot(topo) = atm2lnd_vars%forc_pc13o2_grc(g)
-         end if
-       end do
-#endif
       
        ! glc coupling 
 

@@ -39,7 +39,7 @@ contains
     character (len=32) , intent(out) :: dim3_end_name
     character (len=32) , intent(out) :: dim4_beg_name
     character (len=32) , intent(out) :: dim4_end_name
-    logical            , intent(out) :: data_found
+    logical            , intent(inout) :: data_found
 
     is_int_type    = .false.
     is_real_type   = .false.
@@ -107,6 +107,21 @@ contains
        dim3_beg_name  =  dimname_one
        dim3_end_name  =  dimname_alquimia_num_primary
        data_found   =  .true.
+
+   case(L2E_STATE_FREE_MOBILE)
+      id_val         =  L2E_STATE_FREE_MOBILE
+      name_val       =  'free mobile'
+      long_name_val  =  'free mobile: ELM to EM'
+      units_val      =  '[M]'
+      is_real_type   =  .true.
+      ndim           =  3
+      dim1_beg_name  =  dimname_begc
+      dim1_end_name  =  dimname_endc
+      dim2_beg_name  =  dimname_one
+      dim2_end_name  =  dimname_nlevsoi
+      dim3_beg_name  =  dimname_one
+      dim3_end_name  =  dimname_alquimia_num_primary
+      data_found   =  .true.
 
     case(L2E_STATE_TOTAL_IMMOBILE)
        id_val         =  L2E_STATE_TOTAL_IMMOBILE
@@ -265,6 +280,19 @@ contains
        dim2_end_name  =  dimname_nlevsoi
        data_found   =  .true.
 
+    case(E2L_STATE_SOIL_SULFIDE)
+       id_val         =  E2L_STATE_SOIL_SULFIDE
+       name_val       =  'Soil sulfide'
+       long_name_val  =  'Soil sulfide: EM to ELM'
+       units_val      =  '[mol m^-3]'
+       is_real_type   =  .true.
+       ndim           =  2
+       dim1_beg_name  =  dimname_begc
+       dim1_end_name  =  dimname_endc
+       dim2_beg_name  =  dimname_one
+       dim2_end_name  =  dimname_nlevsoi
+       data_found   =  .true.
+
     case(E2L_STATE_SOIL_FE2)
        id_val         =  E2L_STATE_SOIL_FE2
        name_val       =  'Soil Fe(II)'
@@ -283,6 +311,32 @@ contains
        name_val       =  'Soil iron oxide'
        long_name_val  =  'Soil iron oxide: EM to ELM'
        units_val      =  '[mol Fe m^-3]'
+       is_real_type   =  .true.
+       ndim           =  2
+       dim1_beg_name  =  dimname_begc
+       dim1_end_name  =  dimname_endc
+       dim2_beg_name  =  dimname_one
+       dim2_end_name  =  dimname_nlevsoi
+       data_found   =  .true.
+
+    case(E2L_STATE_SOIL_FE_SULFIDE)
+       id_val         =  E2L_STATE_SOIL_FE_SULFIDE
+       name_val       =  'Soil iron sulfide'
+       long_name_val  =  'Soil iron sulfide: EM to ELM'
+       units_val      =  '[mol Fe m^-3]'
+       is_real_type   =  .true.
+       ndim           =  2
+       dim1_beg_name  =  dimname_begc
+       dim1_end_name  =  dimname_endc
+       dim2_beg_name  =  dimname_one
+       dim2_end_name  =  dimname_nlevsoi
+       data_found   =  .true.
+
+    case(E2L_STATE_SOIL_ACETATE)
+       id_val         =  E2L_STATE_SOIL_ACETATE
+       name_val       =  'Soil acetate'
+       long_name_val  =  'Soil acetate: EM to ELM'
+       units_val      =  '[mol m^-3]'
        is_real_type   =  .true.
        ndim           =  2
        dim1_beg_name  =  dimname_begc
@@ -321,6 +375,21 @@ contains
        id_val         =  E2L_STATE_TOTAL_MOBILE
        name_val       =  'total mobile'
        long_name_val  =  'total mobile: EM to ELM'
+       units_val      =  '[M]'
+       is_real_type   =  .true.
+       ndim           =  3
+       dim1_beg_name  =  dimname_begc
+       dim1_end_name  =  dimname_endc
+       dim2_beg_name  =  dimname_one
+       dim2_end_name  =  dimname_nlevsoi
+       dim3_beg_name  =  dimname_one
+       dim3_end_name  =  dimname_alquimia_num_primary
+       data_found   =  .true.
+
+    case(E2L_STATE_FREE_MOBILE)
+       id_val         =  E2L_STATE_FREE_MOBILE
+       name_val       =  'free mobile'
+       long_name_val  =  'free mobile: EM to ELM'
        units_val      =  '[M]'
        is_real_type   =  .true.
        ndim           =  3

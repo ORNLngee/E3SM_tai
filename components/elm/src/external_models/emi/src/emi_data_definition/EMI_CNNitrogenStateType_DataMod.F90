@@ -39,7 +39,7 @@ contains
     character (len=32) , intent(out) :: dim3_end_name
     character (len=32) , intent(out) :: dim4_beg_name
     character (len=32) , intent(out) :: dim4_end_name
-    logical            , intent(out) :: data_found
+    logical            , intent(inout) :: data_found
 
     is_int_type    = .false.
     is_real_type   = .false.
@@ -141,6 +141,32 @@ contains
        name_val       =  'DON vr'
        long_name_val  =  'DON vr: EM to ELM'
        units_val      =  '[gN/m2]'
+       is_real_type   =  .true.
+       ndim           =  2
+       dim1_beg_name  =  dimname_begc
+       dim1_end_name  =  dimname_endc
+       dim2_beg_name  =  dimname_one
+       dim2_end_name  =  dimname_nlevdecomp_full
+       data_found   =  .true.
+
+    case(E2L_STATE_N2O_VERTICALLY_RESOLVED)
+       id_val         =  E2L_STATE_N2O_VERTICALLY_RESOLVED
+       name_val       =  'N2O vr'
+       long_name_val  =  'N2O vr: EM to ELM'
+       units_val      =  '[gN/m3]'
+       is_real_type   =  .true.
+       ndim           =  2
+       dim1_beg_name  =  dimname_begc
+       dim1_end_name  =  dimname_endc
+       dim2_beg_name  =  dimname_one
+       dim2_end_name  =  dimname_nlevdecomp_full
+       data_found   =  .true.
+
+    case(E2L_STATE_N2_VERTICALLY_RESOLVED)
+       id_val         =  E2L_STATE_N2_VERTICALLY_RESOLVED
+       name_val       =  'N2 vr'
+       long_name_val  =  'N2 vr: EM to ELM'
+       units_val      =  '[gN/m3]'
        is_real_type   =  .true.
        ndim           =  2
        dim1_beg_name  =  dimname_begc

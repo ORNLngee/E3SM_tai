@@ -133,6 +133,7 @@ contains
     use perf_mod             , only: t_startf, t_stopf
     use shr_sys_mod          , only: shr_sys_flush
     use PhosphorusDynamicsMod         , only: PhosphorusBiochemMin_balance
+    use elm_varctl                , only: use_alquimia
 
     !
     ! !ARGUMENTS:
@@ -194,7 +195,7 @@ contains
 
     !-----------------------------------------------------------------------
     ! pflotran: when both 'pf-bgc' and 'pf-h' on, no need to call CLM-CN's N leaching module
-    if (.not. (pf_cmode .and. pf_hmode)) then
+    if (.not. (pf_cmode .and. pf_hmode) .and. .not. use_alquimia) then
      call NitrogenLeaching(bounds, num_soilc, filter_soilc, dt)
 
      call PhosphorusLeaching(bounds, num_soilc, filter_soilc, dt)
@@ -541,7 +542,7 @@ contains
     type(crop_type)          , intent(inout) :: crop_vars
     type(ch4_type)           , intent(in)    :: ch4_vars
     type(photosyns_type)     , intent(in)    :: photosyns_vars
-    type(soilhydrology_type) , intent(in)    :: soilhydrology_vars
+    type(soilhydrology_type) , intent(inout)    :: soilhydrology_vars
     type(energyflux_type)    , intent(in)    :: energyflux_vars
 !
     type(sedflux_type)       , intent(in)    :: sedflux_vars
@@ -574,7 +575,8 @@ contains
           nitrogenstate_vars= col_ns                    , &
           nitrogenflux_vars = col_nf                    , &
           waterstate_vars   = waterstate_vars           , &
-          col_chem          = col_chem            , &
+          soilhydrology_vars= soilhydrology_vars        , &
+          col_chem          = col_chem                  , &
           num_soilc         = num_soilc                 , &
           filter_soilc      = filter_soilc              , &
           col_es            = col_es                    , &

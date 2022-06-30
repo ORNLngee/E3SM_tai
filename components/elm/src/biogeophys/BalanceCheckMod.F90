@@ -249,6 +249,7 @@ contains
           qflx_lat_aqu               =>    col_wf%qflx_lat_aqu            , & ! Input:   [real(r8) (:)   ]  lateral flow between hummock and hollow (mm H2O /s)
           qflx_tide                  =>    col_wf%qflx_tide               , & ! Input:   [real(r8) (:)   ]  tidal flux between consecutive timesteps (mm H2O /s)
           qflx_surf_input            =>    col_wf%qflx_surf_input         , & ! Input:   [real(r8) (:)   ]  input to hollow surface water from hummock (mm H2O /s)
+          eflx_sh_tide               =>    col_ef%eflx_sh_tide            , & ! Input:   [real(r8) (:)   ]  sensible heat flux from tide
 #endif
           snow_sources               =>    col_wf%snow_sources            , & ! Output: [real(r8) (:)   ]  snow sources (mm H2O /s)  
           snow_sinks                 =>    col_wf%snow_sinks              , & ! Output: [real(r8) (:)   ]  snow sinks (mm H2O /s)    
@@ -332,10 +333,12 @@ contains
 #elif (defined MARSH)
              errh2o(c) = endwb(c) - begwb(c) &
                   - (forc_rain_col(c) + forc_snow_col(c)  + qflx_floodc(c) + qflx_irrig(c) &
-                  + qflx_tide(c) & !TAO qflx_tide added
                   - qflx_evap_tot(c) - qflx_surf(c) + qflx_surf_input(c) - qflx_h2osfc_surf(c) &
                   - qflx_qrgwl(c) - qflx_drain(c) - qflx_drain_perched(c) - qflx_snwcp_ice(c)  &
-                  + qflx_lat_aqu(c)) * dtime
+                  ) * dtime
+            if (lun_pp%itype(col_pp%landunit(c)) == istsoil .or. lun_pp%itype(col_pp%landunit(c))==istcrop) then
+               errh2o(c) = errh2o(c) - (qflx_tide(c) + qflx_lat_aqu(c)) * dtime
+            endif
 #else
              errh2o(c) = endwb(c) - begwb(c) &
                   - (forc_rain_col(c) + forc_snow_col(c)  + qflx_floodc(c) + qflx_surf_irrig_col(c) + qflx_over_supply_col(c) &

@@ -167,7 +167,9 @@ contains
          smin_no3_to_plant_vr => col_nf%smin_no3_to_plant_vr , &
          smin_nh4_to_plant_vr => col_nf%smin_nh4_to_plant_vr , &
          smin_no3_runoff      => col_nf%smin_no3_runoff      , &
-         DON_runoff           => col_nf%DON_runoff             &
+         DON_runoff           => col_nf%DON_runoff           , &
+         f_n2o_soil           => col_nf%f_n2o_soil           , &
+         f_n2_soil            => col_nf%f_n2_soil              &
          )
 
     count = 0
@@ -253,6 +255,20 @@ contains
              do fc = 1, num_filter
                 c = filter(fc)
                 DON_runoff(c) = cur_data%data_real_1d(c)
+             enddo
+             cur_data%is_set = .true.
+
+          case (E2L_FLUX_N2O)
+             do fc = 1, num_filter
+                c = filter(fc)
+                f_n2o_soil(c) = cur_data%data_real_1d(c)
+             enddo
+             cur_data%is_set = .true.
+
+          case (E2L_FLUX_N2)
+             do fc = 1, num_filter
+                c = filter(fc)
+                f_n2_soil(c) = cur_data%data_real_1d(c)
              enddo
              cur_data%is_set = .true.
 

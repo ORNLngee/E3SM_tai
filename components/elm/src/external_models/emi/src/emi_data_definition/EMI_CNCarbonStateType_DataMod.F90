@@ -39,7 +39,7 @@ contains
     character (len=32) , intent(out) :: dim3_end_name
     character (len=32) , intent(out) :: dim4_beg_name
     character (len=32) , intent(out) :: dim4_end_name
-    logical            , intent(out) :: data_found
+    logical            , intent(inout) :: data_found
 
     is_int_type    = .false.
     is_real_type   = .false.
@@ -101,6 +101,19 @@ contains
        id_val         =  E2L_STATE_DIC_VERTICALLY_RESOLVED
        name_val       =  'DIC vr'
        long_name_val  =  'DIC vr: EM to ELM'
+       units_val      =  '[gC/m2]'
+       is_real_type   =  .true.
+       ndim           =  2
+       dim1_beg_name  =  dimname_begc
+       dim1_end_name  =  dimname_endc
+       dim2_beg_name  =  dimname_one
+       dim2_end_name  =  dimname_nlevdecomp_full
+       data_found   =  .true.
+
+    case(E2L_STATE_METHANE_VERTICALLY_RESOLVED)
+       id_val         =  E2L_STATE_METHANE_VERTICALLY_RESOLVED
+       name_val       =  'CH4 vr'
+       long_name_val  =  'CH4 vr: EM to ELM'
        units_val      =  '[gC/m2]'
        is_real_type   =  .true.
        ndim           =  2

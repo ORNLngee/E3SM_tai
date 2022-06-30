@@ -60,6 +60,7 @@ contains
     ! !USES:
     use elm_varpar                , only: elm_varpar_init, natpft_lb, natpft_ub
     use elm_varpar                , only: cft_lb, cft_ub, maxpatch_glcmec
+    use elm_varpar                , only: mxpft, numveg, mxpft_nc, numpft
     use elm_varpar                , only: update_pft_array_bounds
     use elm_varpar                , only: surfpft_lb, surfpft_ub
     use elm_varcon                , only: elm_varcon_init
@@ -289,6 +290,17 @@ contains
     ! Independent of model resolution, Needs to stay before surfrd_get_data
 
     call pftconrd()
+    ! by user-defined PFT (numbers and names), 'numpft/mxpft_nc' changed and other indices
+    ! a few arrays had been allocated in elm_initializedMod.F90:L266-268 and require redo after this 'pftconrd' call
+    if ((numpft/=mxpft .or. numpft/=numveg) .or. (mxpft_nc/=24 .or. mxpft_nc/=numveg)) then
+       if (associated(wt_nat_patch)) deallocate(wt_nat_patch)
+       allocate (wt_nat_patch (begg:endg,1:max_topounits, surfpft_lb:surfpft_ub ))
+       if (associated(wt_cft)) deallocate(wt_cft)
+       allocate (wt_cft       (begg:endg,1:max_topounits, cft_lb:cft_ub       ))
+       if (associated(fert_cft)) deallocate(fert_cft)
+       allocate (fert_cft     (begg:endg,1:max_topounits, cft_lb:cft_ub       ))
+    endif
+
     call soilorder_conrd()
 
     ! Read in FATES parameter values early in the call sequence as well
@@ -1015,7 +1027,7 @@ contains
              call get_clump_bounds(nc, bounds_clump)
              call SatellitePhenology(bounds_clump, &
                   filter_inactive_and_active(nc)%num_soilp, filter_inactive_and_active(nc)%soilp, &
-                  waterstate_vars, canopystate_vars)
+                  waterstate_vars, canopystate_vars, soilstate_vars)
           end do
           !$OMP END PARALLEL DO
        end if
@@ -1023,7 +1035,7 @@ contains
     end if
 
     ! Through alquimia, equilibrate initial conditions and initialize data structure
-    if (use_alquimia .and. finidat == ' ') then
+    if (use_alquimia .and. finidat == ' ' .and. .not.is_restart()) then
       !$OMP PARALLEL DO PRIVATE (nc, bounds_clump)
       do nc = 1,nclumps
          call get_clump_bounds(nc, bounds_clump)
