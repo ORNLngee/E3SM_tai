@@ -78,7 +78,8 @@ contains
     real(r8) :: swndf, swndr, swvdf, swvdr, ratio_rvrf, frac, q
     real(r8) :: thiscosz, avgcosz, szenith
     integer  :: swrad_period_len, swrad_period_start, thishr, thismin
-    real(r8) :: timetemp(2)
+    real(r8) :: timetemp(49)
+    integer  :: itemp
     real(r8) :: latixy(500000), longxy(500000)
     integer ::  ierr, varid, dimid, yr, mon, day, tod, nindex(2), caldaym(13)
     integer ::  ncid, met_ncids(14), mask_ncid, thisncid, ng, tm
@@ -307,16 +308,19 @@ contains
             atm2lnd_vars%endyear_met_trans = 2012 
           else if (atm2lnd_vars%metsource == 4) then 
             atm2lnd_vars%endyear_met_trans  = 2014
+            if(index(metdata_type, 'v1') .gt. 0) atm2lnd_vars%endyear_met_trans  = 2010
           else if (atm2lnd_vars%metsource == 5) then
-            atm2lnd_vars%startyear_met      = 566 !76
-            atm2lnd_vars%endyear_met_spinup = 590 !100
-            atm2lnd_vars%endyear_met_trans  = 590 !100
+            atm2lnd_vars%startyear_met      = 566
+            atm2lnd_vars%endyear_met_spinup = 590
+            atm2lnd_vars%endyear_met_trans  = 590
           else if (atm2lnd_vars%metsource == 6) then
             ! CRUJAR v2.3
             atm2lnd_vars%endyear_met_trans  = 2021
           else if (atm2lnd_vars%metsource == 7) then
             ! ERA5
-            atm2lnd_vars%endyear_met_trans  = 2023
+            atm2lnd_vars%startyear_met      = 1950
+            atm2lnd_vars%endyear_met_spinup = 1970
+            atm2lnd_vars%endyear_met_trans  = 2024
           end if
 
           if (use_livneh) then 
@@ -324,7 +328,7 @@ contains
               atm2lnd_vars%endyear_met_spinup = 1969
           else if (use_daymet) then 
               atm2lnd_vars%startyear_met      = 1980
-              atm2lnd_vars%endyear_met_spinup = atm2lnd_vars%endyear_met_trans
+              atm2lnd_vars%endyear_met_spinup = min(2000,atm2lnd_vars%endyear_met_trans)
           end if
 
           nyears_spinup = atm2lnd_vars%endyear_met_spinup - &
@@ -355,6 +359,12 @@ contains
             !Figure out the closest point and which zone file to open
             mindist=99999
             do g3 = 1,ng
+              ! in CPL_BYPASS met dataset, longitude is in format of 0-360, but 'ldomain%lonc(g)' may or may not.
+              if (ldomain%lonc(g) .lt. 0) then
+                if (longxy(g3) >= 180) longxy(g3) = longxy(g3)-360._r8
+              else if (ldomain%lonc(g) .ge. 180) then
+                if (longxy(g3) < 0) longxy(g3) = longxy(g3) + 360._r8
+              end if
               thisdist = 100*((latixy(g3) - ldomain%latc(g))**2 + &
                               (longxy(g3) - ldomain%lonc(g))**2)**0.5
               if (thisdist .lt. mindist) then 
@@ -407,13 +417,16 @@ contains
                 end if
             else if (atm2lnd_vars%metsource == 4) then 
                 metdata_fname = 'GSWP3_' // trim(metvars(v)) // '_1901-2014_z' // zst(2:3) // '.nc'
+                if(index(metdata_type, 'v1') .gt. 0) &
+                    metdata_fname = 'GSWP3_' // trim(metvars(v)) // '_1901-2010_z' // zst(2:3) // '.nc'
+
                 if (use_livneh .and. ztoget .ge. 16 .and. ztoget .le. 20) then 
                     metdata_fname = 'GSWP3_Livneh_' // trim(metvars(v)) // '_1950-2010_z' // zst(2:3) // '.nc'                
                 else if (use_daymet .and. (index(metdata_type, 'daymet4') .gt. 0) ) then
                    !daymet v4 with GSWP3 v2 for NA with user-defined zone-mappings.txt
                     metdata_fname = 'GSWP3_daymet4_' // trim(metvars(v)) // '_1980-2014_z' // zst(2:3) // '.nc'
                 else if (use_daymet .and. ztoget .ge. 16 .and. ztoget .le. 20) then 
-                    metdata_fname = 'GSWP3_Daymet3_' // trim(metvars(v)) // '_1980-2010_z' // zst(2:3) // '.nc' 
+                    metdata_fname = 'GSWP3v1_Daymet_' // trim(metvars(v)) // '_1980-2010_z' // zst(2:3) // '.nc'
                 end if
             else if (atm2lnd_vars%metsource == 5) then 
                     !metdata_fname = 'WCYCL1850S.ne30_' // trim(metvars(v)) // '_0076-0100_z' // zst(2:3) // '.nc'
@@ -421,36 +434,55 @@ contains
             else if (atm2lnd_vars%metsource == 6) then
                 ! CRUJRA v2.3
                 metdata_fname = 'CRUJRAV2.3.c2023.0.5x0.5_' // trim(metvars(v)) // '_1901-2021_z' // zst(2:3) // '.nc'
+                if(index(metdata_type, 'trendy2025') .gt. 0) then
+                    metdata_fname = 'elmforc.TRENDY.c2025.0.5x0.5_' // trim(metvars(v)) // '_1901-2024_z' // zst(2:3) // '.nc'
+                elseif(index(metdata_type, 'trendy2024') .gt. 0) then
+                    metdata_fname = 'crujra.v2.5.5d.0.5x0.5_' // trim(metvars(v)) // '_1901-2023_z' // zst(2:3) // '.nc'
+                elseif(index(metdata_type, 'trendy2023') .gt. 0) then
+                    metdata_fname = 'crujra.v2.4.5d.0.5x0.5_' // trim(metvars(v)) // '_1901-2022_z' // zst(2:3) // '.nc'
+                endif
             else if (atm2lnd_vars%metsource == 7) then
                 ! ERA5
                 if (use_daymet .and. (index(metdata_type, 'daymet4') .gt. 0) ) then
                    !daymet v4 with ERA5 v2023 for NA with user-defined zone-mappings.txt
                     metdata_fname = 'Daymet_ERA5.1km_' // trim(metvars(v)) // '_1980-2023_z' // zst(2:3) // '.nc'
                 else
-                    metdata_fname = 'era5.25d_' // trim(metvars(v)) // '_1949-2023_z' // zst(2:3) // '.nc'
+                    metdata_fname = 'ERA5_' // trim(metvars(v)) // '_1950-2024_z' // zst(2:3) // '.nc'
                 end if
             end if
   
             ierr = nf90_open(trim(metdata_bypass) // '/' // trim(metdata_fname), NF90_NOWRITE, met_ncids(v))
-            if (ierr .ne. 0) call endrun(msg=' ERROR: Failed to open cpl_bypass input meteorology file ' // trim(metdata_bypass) // '/' // trim(metdata_fname))
+            if (ierr .ne. 0) call endrun(msg=' ERROR: Failed to open cpl_bypass input meteorology file' // &
+               trim(metdata_bypass) // '/' // trim(metdata_fname) )
        
             !get timestep information
             ierr = nf90_inq_dimid(met_ncids(v), 'DTIME', dimid)
             ierr = nf90_Inquire_Dimension(met_ncids(v), dimid, len = atm2lnd_vars%timelen(v))
 
             starti(1) = 1
-            counti(1) = 2
+            counti(1) = 49
             ierr = nf90_inq_varid(met_ncids(v), 'DTIME', varid)
             ierr = nf90_get_var(met_ncids(v), varid, timetemp, starti(1:1), counti(1:1))   
-            atm2lnd_vars%timeres(v)        = (timetemp(2)-timetemp(1))*24._r8
-            atm2lnd_vars%npf(v)            = 86400d0*(timetemp(2)-timetemp(1))/get_step_size()  
+            atm2lnd_vars%timeres(v)        = 0._r8
+            do itemp=2,counti(1)
+               atm2lnd_vars%timeres(v)     = atm2lnd_vars%timeres(v)+ &
+                                             (timetemp(itemp)-timetemp(itemp-1))*24._r8
+            end do
+            atm2lnd_vars%timeres(v)        = atm2lnd_vars%timeres(v)/(counti(1)-1.0_r8)
+            atm2lnd_vars%npf(v)            = 3600d0*atm2lnd_vars%timeres(v)/get_step_size()
+
             atm2lnd_vars%timelen_spinup(v) = nyears_spinup*(365*nint(24./atm2lnd_vars%timeres(v)))
     
             ierr = nf90_inq_varid(met_ncids(v), trim(metvars(v)), varid)
+
             !get the conversion factors
             ierr = nf90_get_att(met_ncids(v), varid, 'scale_factor', atm2lnd_vars%scale_factors(v))
+            if (ierr .ne. 0) atm2lnd_vars%scale_factors(v) = 1.0d0
+
             ierr = nf90_get_att(met_ncids(v), varid, 'add_offset', atm2lnd_vars%add_offsets(v))
-            !get the met data         
+            if (ierr .ne. 0) atm2lnd_vars%add_offsets(v) = 0.0d0
+
+            !get the met data	     
             starti(1) = 1
             starti(2) = gtoget
             counti(1) = atm2lnd_vars%timelen_spinup(v)
@@ -507,9 +539,9 @@ contains
             if (atm2lnd_vars%metsource == 5) mystart=1850
 
             if (yr .lt. 1850) then 
-              atm2lnd_vars%tindex(g,v,1) = (mod(yr-1,nyears_spinup) + (1850-mystart)) * 365 * nint(24./atm2lnd_vars%timeres(v))
+              atm2lnd_vars%tindex(g,v,1) = mod(yr+1849-mystart,nyears_spinup) * 365 * nint(24./atm2lnd_vars%timeres(v))
             else if (yr .le. atm2lnd_vars%endyear_met_spinup) then
-              atm2lnd_vars%tindex(g,v,1) = (mod(yr-1850,nyears_spinup) + (1850-mystart)) * 365 * nint(24./atm2lnd_vars%timeres(v))
+              atm2lnd_vars%tindex(g,v,1) = mod(yr-mystart,nyears_spinup) * 365 * nint(24./atm2lnd_vars%timeres(v))
             else
               atm2lnd_vars%tindex(g,v,1) = (yr - atm2lnd_vars%startyear_met) * 365 * nint(24./atm2lnd_vars%timeres(v))
             end if
@@ -522,8 +554,12 @@ contains
               atm2lnd_vars%tindex(g,v,1) = atm2lnd_vars%timelen(v)
               if (yr .le. atm2lnd_vars%endyear_met_spinup) atm2lnd_vars%tindex(g,v,1) = atm2lnd_vars%timelen_spinup(v)
              end if
+
           end do    !end variable loop        
+
+        !
         else
+          ! met data loaded
           do v=1,met_nvars
             if (atm2lnd_vars%npf(v) - 1._r8 .gt. 1e-3) then 
               if (v .eq. 4 .or. v .eq. 5 .or. (v .ge. 8 .and. v .le. 13)) then    !rad/Precipitation
@@ -532,17 +568,20 @@ contains
                   atm2lnd_vars%tindex(g,v,2) = atm2lnd_vars%tindex(g,v,2)+1
                 end if
               else  
-                if (mod(tod/get_step_size()-1,nint(atm2lnd_vars%npf(v))) <= atm2lnd_vars%npf(v)/2._r8 .and. &
-                    mod(tod/get_step_size(),nint(atm2lnd_vars%npf(v))) > atm2lnd_vars%npf(v)/2._r8) then 
+                if ( (mod(tod/get_step_size(),nint(atm2lnd_vars%npf(v)))-atm2lnd_vars%npf(v)/2._r8) .ge. -1.e-3 .and. &
+                     (mod(tod/get_step_size()+1,nint(atm2lnd_vars%npf(v)))-atm2lnd_vars%npf(v)/2._r8) .lt. 0. ) then
                   atm2lnd_vars%tindex(g,v,1) = atm2lnd_vars%tindex(g,v,1)+1
                   atm2lnd_vars%tindex(g,v,2) = atm2lnd_vars%tindex(g,v,2)+1
                 end if
               end if
+
             else
+
               atm2lnd_vars%tindex(g,v,1) = atm2lnd_vars%tindex(g,v,1)+nint(1/atm2lnd_vars%npf(v))
               atm2lnd_vars%tindex(g,v,2) = atm2lnd_vars%tindex(g,v,2)+nint(1/atm2lnd_vars%npf(v))  
             end if
 
+            ! cycling years of data
             if (const_climate_hist .or. yr .le. atm2lnd_vars%startyear_met) then
               if (atm2lnd_vars%tindex(g,v,1) .gt. atm2lnd_vars%timelen_spinup(v)) atm2lnd_vars%tindex(g,v,1) = 1
               if (atm2lnd_vars%tindex(g,v,2) .gt. atm2lnd_vars%timelen_spinup(v)) atm2lnd_vars%tindex(g,v,2) = 1
@@ -601,15 +640,17 @@ contains
                                                      atm2lnd_vars%add_offsets(3))*wt1(3) + (atm2lnd_vars%atm_input(3,g,1,tindex(3,2)) &
                                                      *atm2lnd_vars%scale_factors(3)+atm2lnd_vars%add_offsets(3))*wt2(3)) * &
                                                      atm2lnd_vars%var_mult(3,g,mon) + atm2lnd_vars%var_offset(3,g,mon), 1e-9_r8)
-
-        if (atm2lnd_vars%metsource == 2) then  !convert RH to qbot                             
-          if (tbot > SHR_CONST_TKFRZ) then
-            e = esatw(tdc(tbot))
-          else
-            e = esati(tdc(tbot))
-          end if
-          qsat           = 0.622_r8*e / (atm2lnd_vars%forc_pbot_not_downscaled_grc(g) - 0.378_r8*e)
+        !
+        if (tbot > SHR_CONST_TKFRZ) then
+          e = esatw(tdc(tbot))
+        else
+          e = esati(tdc(tbot))
+        end if
+        qsat = 0.622_r8*e / (atm2lnd_vars%forc_pbot_not_downscaled_grc(g) - 0.378_r8*e)
+        if (atm2lnd_vars%metsource == 2) then                            !convert RH to qbot, when input is actually RH
           atm2lnd_vars%forc_q_not_downscaled_grc(g) = qsat * atm2lnd_vars%forc_q_not_downscaled_grc(g) / 100.0_r8
+        else if(atm2lnd_vars%forc_q_not_downscaled_grc(g)>qsat) then     ! data checking for specific humidity
+          atm2lnd_vars%forc_q_not_downscaled_grc(g) = qsat
         end if
 
         !use longwave from file if provided
