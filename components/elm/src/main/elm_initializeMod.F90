@@ -1138,12 +1138,6 @@ contains
     ! initialize2 because it is used to initialize other variables; now it can be
     ! deallocated
 
-
-
-    ! topo_glc_mec was allocated in initialize1, but needed to be kept around through
-    ! initialize2 because it is used to initialize other variables; now it can be
-    ! deallocated
-
     deallocate(topo_glc_mec)
 
     !------------------------------------------------------------
