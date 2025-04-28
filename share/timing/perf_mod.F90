@@ -744,10 +744,10 @@ contains
 #endif
    if ((perf_add_detail) .AND. (cur_timing_detail < 100)) then
       write(cdetail,'(i2.2)') cur_timing_detail
-      str_length = min(SHR_KIND_CM-3,len_trim(event))
+      str_length = min(SHR_KIND_CM-3,len_trim(event), len(event)) ! japg [03-31-2025]  => I added str_length = min(SHR_KIND_CM - 3, len_trim(event), len(event))
       TIMERSTART(event(1:str_length)//'_'//cdetail)
    else
-      str_length = min(SHR_KIND_CM,len_trim(event))
+      str_length = min(SHR_KIND_CM,len_trim(event),   len(event)) ! japg [03-31-2025]  => I added str_length = min(SHR_KIND_CM - 3, len_trim(event), len(event))
       TIMERSTART(event(1:str_length))
    endif
 #ifndef NUOPC_INTERFACE
@@ -841,11 +841,11 @@ write(p_logunit,*) 'japg7 ============================> perf_mod.F90/t_stropf', 
       if ((perf_add_detail) .AND. (cur_timing_detail < 100)) then
          write(cdetail,'(i2.2)') cur_timing_detail
          write(p_logunit,*) 'japg10 ============================> perf_mod.F90/t_stropf'
-         str_length = min(SHR_KIND_CM-3,len_trim(event))
+         str_length = min(SHR_KIND_CM-3,len_trim(event), len(event)) ! japg [03-31-2025]  => I added str_length = min(SHR_KIND_CM - 3, len_trim(event), len(event))
          TIMERSTOP(event(1:str_length)//'_'//cdetail)
       else
          write(p_logunit,*) 'japg11 ============================> perf_mod.F90/t_stropf'
-         str_length = min(SHR_KIND_CM,len_trim(event))
+         str_length = min(SHR_KIND_CM,len_trim(event), len(event)) ! japg [03-31-2025]  => I added str_length = min(SHR_KIND_CM - 3, len_trim(event), len(event))
          TIMERSTOP(event(1:str_length))
       endif
 #ifdef NUOPC_INTERFACE
@@ -944,13 +944,13 @@ write(p_logunit,*) 'japg7 ============================> perf_mod.F90/t_stropf', 
    if ((perf_add_detail) .AND. (cur_timing_detail < 100)) then
 
       write(cdetail,'(i2.2)') cur_timing_detail
-      str_length = min(SHR_KIND_CM-3,len_trim(event))
+      str_length = min(SHR_KIND_CM-3,len_trim(event), len(event)) ! japg [03-31-2025]  => I added str_length = min(SHR_KIND_CM - 3, len_trim(event), len(event))
       ierr = GPTLstartstop_vals( &
          event(1:str_length)//'_'//cdetail, wtime, callcnt)
 
    else
 
-      str_length = min(SHR_KIND_CM,len_trim(event))
+      str_length = min(SHR_KIND_CM,len_trim(event), len(event)) ! japg [03-31-2025]  => I added str_length = min(SHR_KIND_CM - 3, len_trim(event), len(event))
       ierr = GPTLstartstop_vals(trim(event), wtime, callcnt)
 
    endif

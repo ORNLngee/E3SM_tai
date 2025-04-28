@@ -54,6 +54,7 @@ contains
     integer            :: npft  ! number of pfts on pft-physiology file
     !-----------------------------------------------------------------------
 
+    write(iulog,*) 'japg1 ========================================================================> readParamsMod.F90/CNParamsSharedReadFile'
     if (masterproc) then
        write(iulog,*) 'readParamsMod.F90::'//trim(subname)//' :: reading CN '//&
           'and BGC parameter file'
@@ -69,6 +70,7 @@ contains
     !
     call ParamsReadShared(ncid)
 
+    write(iulog,*) 'japg2 ========================================================================> readParamsMod.F90/CNParamsSharedReadFile'
 
   end subroutine CNParamsSharedReadFile
 

@@ -196,8 +196,9 @@ contains
 
 #if (defined COL4TH)
          if (c .eq. 1) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_frac*(zwt(c)))   !at 30cm, hummock saturated at 5% changed to 0.1 TAO
-         if (c .eq. 2) fsat(c) = 1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)))   !at 30cm, hummock saturated at 5% changed to 0.1 TAO
-         if (c .eq. 3) fsat(c) = min(1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)-h2osfc(c)/1000.+humhol_ht)), 1._r8) !TAO 0.3 t0 0.1, 0.15 to 0.35 !bsulman: what does 0.15 represent?
+         if (c .eq. 2) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_frac*(zwt(c)))   !at 30cm, hummock saturated at 5% changed to 0.1 TAO
+         if (c .eq. 3) fsat(c) = 1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)))   !at 30cm, hummock saturated at 5% changed to 0.1 TAO
+         if (c .eq. 4) fsat(c) = min(1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)-h2osfc(c)/1000.+humhol_ht)), 1._r8) !TAO 0.3 t0 0.1, 0.15 to 0.35 !bsulman: what does 0.15 represent?
 #endif
 
          ! use perched water table to determine fsat (if present)
@@ -224,8 +225,9 @@ contains
 
 #if (defined COL4TH)
             if (c .eq. 1) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_frac*(zwt(c)))   !at 30cm, hummock saturated at 5%
-            if (c .eq. 2) fsat(c) = 1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)))
-            if (c .eq. 3) fsat(c) = min(1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)-h2osfc(c)/1000.+humhol_ht)), 1._r8) !TAO 0.3 t 0.1, 0.15 to 0.35
+            if (c .eq. 2) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_frac*(zwt(c)))   !at 30cm, hummock saturated at 5%
+            if (c .eq. 3) fsat(c) = 1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)))
+            if (c .eq. 4) fsat(c) = min(1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)-h2osfc(c)/1000.+humhol_ht)), 1._r8) !TAO 0.3 t 0.1, 0.15 to 0.35
 #endif
 
          else
@@ -249,8 +251,9 @@ contains
 
 #if (defined COL4TH)
             if (c .eq. 1) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_frac*(zwt(c))) !at 30cm, hummock saturated at 5%
-            if (c .eq. 2) fsat(c) = 1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)))
-            if (c .eq. 3) fsat(c) = min(1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)-h2osfc(c)/1000.+humhol_ht)), 1._r8) !TAO 0.3 t 1.5, 0.15 to 0.35
+            if (c .eq. 2) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_frac*(zwt(c))) !at 30cm, hummock saturated at 5%
+            if (c .eq. 3) fsat(c) = 1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)))
+            if (c .eq. 4) fsat(c) = min(1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)-h2osfc(c)/1000.+humhol_ht)), 1._r8) !TAO 0.3 t 1.5, 0.15 to 0.35
 #endif
          endif
          if (origflag == 1) then
@@ -291,14 +294,13 @@ contains
             else
              qflx_surf(c) = 0._r8   !turn off surface runoff for hollow
             endif
-#elif (defined COL4TH)
-            if (c .eq. 1) then  !XS - only compute sfc runoff from hummock, send to hollow 
-             qflx_surf(c) = fcov(c) * qflx_top_soil(c) !TAO
-            else if (c .eq. 2) then
-             qflx_surf(c) = fcov(c) * qflx_top_soil(c) !TAO
+#elif (defined COL4TH)                
+            if (c .ne. 4) then                                       !japg [4-17-2025] => modifycations are needed here !!!
+               qflx_surf(c) = fcov(c) * qflx_top_soil(c) !TAO
             else
-             qflx_surf(c) = 0._r8   !turn off surface runoff for hollow
+               qflx_surf(c) = 0._r8   !turn off surface runoff for hollow
             endif
+
 #else
            qflx_surf(c) = fcov(c) * qflx_top_soil(c)
 #endif
@@ -442,8 +444,8 @@ contains
 #endif
 
 #if defined COL4TH
-     real(r8) :: ka_hu1, ka_hu2                    ! hydraulic conductivity terms at saturation for hummock (mmH2O/s)
-     real(r8) :: zwt_hu1, zwt_hu2                  ! water table depth for hollows and 2 hummocks (m) [Wei Huang 2022-08-10]
+     real(r8) :: ka_hu1, ka_hu2, ka_hu3                    ! hydraulic conductivity terms at saturation for hummock (mmH2O/s)
+     real(r8) :: zwt_hu1, zwt_hu2, zwt_hu3                  ! water table depth for hollows and 2 hummocks (m) [Wei Huang 2022-08-10]
 #endif
 
      integer  :: tide_time_idx
@@ -563,9 +565,10 @@ contains
 #if defined COL4TH
        ka_hu1 = 0._r8
        ka_hu2 = 0._r8
+       ka_hu3 = 0._r8 
 #endif
 
-       do fc = 1, num_hydrologyc
+      do fc = 1, num_hydrologyc
           c = filter_hydrologyc(fc)
           ! partition moisture fluxes between soil and h2osfc
           if (lun_pp%itype(col_pp%landunit(c)) == istsoil .or. lun_pp%itype(col_pp%landunit(c))==istcrop) then
@@ -606,7 +609,8 @@ contains
              if (c .eq. 1) then
                qflx_surf_input(1) = 0._r8 !hummock TAO KEEP AT ZERO!!!
                qflx_surf_input(2) = 0._r8 !hummock TAO KEEP AT ZERO!!!
-               qflx_surf_input(3) = qflx_surf(2)*(hum_frac/hol_frac)     !hollow TAO
+               qflx_surf_input(3) = 0._r8 !hummock TAO KEEP AT ZERO!!!
+               qflx_surf_input(4) = qflx_surf(2)*(hum_frac/hol_frac)     !hollow TAO
              end if
              qflx_in_soil(c) = (1._r8 - frac_h2osfc(c)) * (qflx_top_soil(c) - qflx_surf(c) + qflx_surf_input(c))
              qflx_in_h2osfc(c) = frac_h2osfc(c) * (qflx_top_soil(c) - qflx_surf(c) + qflx_surf_input(c))
@@ -715,13 +719,12 @@ contains
                 qflx_h2osfc_surf(c) = 0._r8
 
 #elif (defined COL4TH)
-             qflx_tide(c) = 0._r8
-             if (h2osfc(c) .gt. 0._r8 .and. c==1) then
-                 qflx_h2osfc_surf(c) = min(qflx_h2osfc_surfrate*h2osfc(c)**2.0_r8,h2osfc(c) / dtime)
-             else if (h2osfc(c) .gt. 0._r8 .and. c==2) then
-                 qflx_h2osfc_surf(c) = min(qflx_h2osfc_surfrate*h2osfc(c)**2.0_r8,h2osfc(c) / dtime) 
-             else if (c .eq. 3) then
-                 qflx_h2osfc_surf(c) = 0._r8
+               ! (TODO) needs checking
+               qflx_tide(c) = 0._r8
+               if (h2osfc(c) .gt. 0._r8 .and. c .ne. 4) then
+                  qflx_h2osfc_surf(c) = min(qflx_h2osfc_surfrate*h2osfc(c)**2.0_r8,h2osfc(c) / dtime)
+               else if (c .eq. 4) then
+                  qflx_h2osfc_surf(c) = 0._r8
 
 #else
              if(h2osfc(c) >= h2osfc_thresh(c) .and. h2osfcflag/=0) then
@@ -866,7 +869,7 @@ contains
 #endif
 
 #if (defined COL3RD)
-             write(iulog,*), 'SoilHydro -> col3rd_num_hydrologyc = ', num_hydrologyc ! ====================================> JAPG's Line code 
+             write(iulog,*), 'SoilHydro -> col3rd_num_hydrologyc = ', num_hydrologyc ! ====================================> japg [04-23-2025]
              if(num_hydrologyc .ne. 3) call endrun(msg="Error: Must have 3 columns if COL3RD is defined")
              !compute lateral flux in aquifer
              if (jwt(c) .lt. nlevbed) then
@@ -933,7 +936,7 @@ contains
                endif
                ! bsulman : Changed to use flexible set of parameters up to full NOAA tidal components (37 coefficients)
                ! Tidal cycle is the sum of all the sinusoidal components
-#ifdef COL3RD
+
                call get_curr_time(days, seconds)
                h2osfc_tide = 0.0_r8
                if(tide_file .ne. ' ') then
@@ -1017,18 +1020,17 @@ contains
                   endif
                 endif
                 write(iulog,*), 'qflx_lat_aqu(1) after', qflx_lat_aqu(1), qflx_lat_aqu(2), qflx_lat_aqu(3)
-#endif
+
              endif
 #endif
 
 
 
-! START COL4TH ============================================================================================================================================================================================================================================================
-
+! japg [04-17-2025] START COL4TH ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
 
 #if (defined COL4TH)
-             write(iulog,*), 'SoilHydro -> num_hydrologyc = ', num_hydrologyc ! ====================================> JAPG's Line code 
-             if(num_hydrologyc .ne. 3) call endrun(msg="Error: Must have 4 columns if COL4TH is defined")
+             write(iulog,*), 'japg1 [04-28-2025] ===============> SoilHydrologyMod.F90/Infiltration,  num_hydrologyc = ', num_hydrologyc ! ==========> japg [04-23-2025]
+             if(num_hydrologyc .ne. 4) call endrun(msg="Error: Must have 4 columns if COL4TH is defined")
              !compute lateral flux in aquifer
              if (jwt(c) .lt. nlevbed) then
                 do j=nlevbed,jwt(c)+1,-1
@@ -1040,7 +1042,9 @@ contains
                                 dzmm(c,j)/sum(dzmm(c,jwt(c)+1:nlevbed))
                   if (c .eq. 2) ka_hu2 = ka_hu2+(hksat(c,j)*s1**(2._r8*bsw(c,j)+3._r8))* &
                                 dzmm(c,j)/sum(dzmm(c,jwt(c)+1:nlevbed))
-                  if (c .eq. 3) ka_ho = ka_ho+(hksat(c,j)*s1**(2._r8*bsw(c,j)+3._r8))* &
+                  if (c .eq. 3) ka_hu3 = ka_hu3+(hksat(c,j)*s1**(2._r8*bsw(c,j)+3._r8))* &
+                                dzmm(c,j)/sum(dzmm(c,jwt(c)+1:nlevbed))
+                  if (c .eq. 4) ka_ho = ka_ho+(hksat(c,j)*s1**(2._r8*bsw(c,j)+3._r8))* &
                                 dzmm(c,j)/sum(dzmm(c,jwt(c)+1:nlevbed))
                 end do
              else
@@ -1050,7 +1054,8 @@ contains
                   s1 = min(1._r8, s1)
                   if (c .eq. 1) ka_hu1 = ka_hu1+(hksat(c,jwt(c))*s1**(2._r8*bsw(c,jwt(c))+3._r8))
                   if (c .eq. 2) ka_hu2 = ka_hu2+(hksat(c,jwt(c))*s1**(2._r8*bsw(c,jwt(c))+3._r8))
-                  if (c .eq. 3) ka_ho = ka_ho+(hksat(c,jwt(c))*s1**(2._r8*bsw(c,jwt(c))+3._r8))
+                  if (c .eq. 3) ka_hu3 = ka_hu3+(hksat(c,jwt(c))*s1**(2._r8*bsw(c,jwt(c))+3._r8))
+                  if (c .eq. 4) ka_ho = ka_ho+(hksat(c,jwt(c))*s1**(2._r8*bsw(c,jwt(c))+3._r8))
              end if
 
              if (c.eq.1) then
@@ -1062,12 +1067,18 @@ contains
                zwt_hu2 = zwt(2)
                zwt_hu2 = zwt_hu2 - h2osfc(2)/1000._r8
              endif
-
+             
              if (c.eq.3) then
-               zwt_ho = zwt(3)
+               zwt_hu3 = zwt(3)
+               zwt_hu3 = zwt_hu2 - h2osfc(3)/1000._r8
+             endif
+
+             if (c.eq.4) then
+               zwt_ho = zwt(4)
                ka_ho = max(ka_ho, 1e-5_r8)
                ka_hu1 = max(ka_hu1, 1e-5_r8)
                ka_hu2 = max(ka_hu2, 1e-5_r8)
+               ka_hu3 = max(ka_hu3, 1e-5_r8)
                !DMR 9/21/15 - only inlcude h2osfc if water table near surfce,
                !use harmonic mean 
                if (zwt_ho < 0.03_r8) then
@@ -1085,7 +1096,9 @@ contains
                      humhol_ht*humhol_ht_frac) / humhol_dist * sqrt(hol_frac/hum_frac)
                  qflx_lat_aqu(2) =  2._r8/(1._r8/ka_hu2+1._r8/ka_ho) * (zwt_hu2-zwt_ho- &
                      humhol_ht) / humhol_dist * sqrt(hol_frac/hum_frac)
-                 qflx_lat_aqu(3) = -2._r8/(1._r8/ka_hu2+1._r8/ka_ho) * (zwt_hu2-zwt_ho- &
+                 qflx_lat_aqu(3) =  2._r8/(1._r8/ka_hu3+1._r8/ka_ho) * (zwt_hu2-zwt_ho- &
+                     humhol_ht) / humhol_dist * sqrt(hol_frac/hum_frac)
+                 qflx_lat_aqu(4) = -2._r8/(1._r8/ka_hu3+1._r8/ka_ho) * (zwt_hu2-zwt_ho- &
                      humhol_ht) / humhol_dist * sqrt(hum_frac/hol_frac)
                  !salinity(1) = 25._r8 + 20_r8*qflx_lat_aqu(2)*dtime
                  !salinity(1) = 0._r8
@@ -1116,12 +1129,14 @@ contains
                         col_ws%salinity(c) = atm2lnd_vars%tide_salinity(1,1+tide_time_idx)
                         salinity(1) = col_ws%salinity(c)
                         salinity(2) = salinity(1)
+                        salinity(3) = salinity(2)
                         write(iulog,*), 'h2osfc_tide1_1:',h2osfc_tide
                         write(iulog,*), 'tide_salinity_1:',salinity(1)
                      else
                         col_ws%salinity(c) = sum(atm2lnd_vars%tide_salinity)/atm2lnd_vars%tide_forcing_len
                         salinity(1) = col_ws%salinity(c)
                         salinity(2) = salinity(1)
+                        salinity(3) = salinity(2)
                         h2osfc_tide = 0.0_r8
                         do ii=1,num_tide_comps
                            h2osfc_tide =    h2osfc_tide    +  tide_coeff_amp(ii) * sin(2.0_r8*SHR_CONST_PI/tide_coeff_period(ii)*(days*secspday+seconds)/360 + tide_coeff_phase(ii))
@@ -1133,6 +1148,7 @@ contains
                      col_ws%salinity(c) = sum(atm2lnd_vars%tide_salinity)/atm2lnd_vars%tide_forcing_len
                      salinity(1) = col_ws%salinity(c)
                      salinity(2) = salinity(1)
+                     salinity(3) = salinity(2)
                      h2osfc_tide = 0.0_r8
                      do ii=1,num_tide_comps
                         h2osfc_tide =    h2osfc_tide    +  tide_coeff_amp(ii) * sin(2.0_r8*SHR_CONST_PI/tide_coeff_period(ii)*(days*secspday+seconds)/360 + tide_coeff_phase(ii))
@@ -1152,19 +1168,19 @@ contains
                write(iulog,*), 'h2osfc_tide_final:',h2osfc_tide 
                 h2osfc_tide = max(h2osfc_tide + tide_baseline, 0.0)
                !  qflx_tide(c) = (h2osfc(c)-h2osfc_before)/dtime
-                qflx_lat_aqu(3) = qflx_lat_aqu(3) + (h2osfc_tide-h2osfc(c))/dtime
+                qflx_lat_aqu(4) = qflx_lat_aqu(4) + (h2osfc_tide-h2osfc(c))/dtime
                 write(iulog,*), 'qflx_lat_aqu(c)', qflx_lat_aqu(1), qflx_lat_aqu(2), qflx_lat_aqu(3)
                 write(iulog,*), 'h2osfc(c)', h2osfc(1), h2osfc(2), h2osfc(3)
                 ! If flooded water surface of one column is higher than the other, add faster flow since aquifer transfer (ka parameters) is slow
-                if(h2osfc(3)>0 .and. h2osfc(3)>(h2osfc(2)+humhol_ht*1000.0)) then
-                  qflx_lat_aqu(3) = qflx_lat_aqu(3) - min((h2osfc(3)-(h2osfc(2)+humhol_ht*1000.0))*sfcflow_ratescale,h2osfc(3)*0.5/dtime)
-                  qflx_lat_aqu(2) = qflx_lat_aqu(2) + min((h2osfc(3)-(h2osfc(2)+humhol_ht*1000.0))*sfcflow_ratescale,h2osfc(3)*0.5/dtime)
-                  if (h2osfc(2)>0 .and. (h2osfc(1)+humhol_ht*humhol_ht_frac*1000.0) < h2osfc(2)+humhol_ht*1000.0) then
-                     qflx_lat_aqu(2) = qflx_lat_aqu(2) - min((h2osfc(2)+humhol_ht*1000.0-(h2osfc(1)+humhol_ht*humhol_ht_frac*1000.0))*sfcflow_ratescale,h2osfc(2)*0.5/dtime)
-                     qflx_lat_aqu(1) = qflx_lat_aqu(1) + min((h2osfc(2)+humhol_ht*1000.0-(h2osfc(1)+humhol_ht*humhol_ht_frac*1000.0))*sfcflow_ratescale,h2osfc(2)*0.5/dtime)
+                if(h2osfc(4)>0 .and. h2osfc(4)>(h2osfc(3)+humhol_ht*1000.0)) then
+                  qflx_lat_aqu(4) = qflx_lat_aqu(4) - min((h2osfc(4)-(h2osfc(3)+humhol_ht*1000.0))*sfcflow_ratescale,h2osfc(4)*0.5/dtime)
+                  qflx_lat_aqu(3) = qflx_lat_aqu(3) + min((h2osfc(3)-(h2osfc(3)+humhol_ht*1000.0))*sfcflow_ratescale,h2osfc(4)*0.5/dtime)
+                  if (h2osfc(3)>0 .and. (h2osfc(2)+humhol_ht*humhol_ht_frac*1000.0) < h2osfc(3)+humhol_ht*1000.0) then
+                     qflx_lat_aqu(3) = qflx_lat_aqu(3) - min((h2osfc(3)+humhol_ht*1000.0-(h2osfc(2)+humhol_ht*humhol_ht_frac*1000.0))*sfcflow_ratescale,h2osfc(3)*0.5/dtime)
+                     qflx_lat_aqu(1) = qflx_lat_aqu(2) + min((h2osfc(3)+humhol_ht*1000.0-(h2osfc(2)+humhol_ht*humhol_ht_frac*1000.0))*sfcflow_ratescale,h2osfc(3)*0.5/dtime)
                   elseif (h2osfc(1)>0 .and. (h2osfc(1)+humhol_ht*humhol_ht_frac*1000.0) > h2osfc(2)+humhol_ht*1000.0) then
-                     qflx_lat_aqu(2) = qflx_lat_aqu(2) + min(((h2osfc(1)+humhol_ht*humhol_ht_frac*1000.0)-h2osfc(2)-humhol_ht*1000.0)*sfcflow_ratescale,h2osfc(1)*0.5/dtime)
-                     qflx_lat_aqu(1) = qflx_lat_aqu(1) - min(((h2osfc(1)+humhol_ht*humhol_ht_frac*1000.0)-h2osfc(2)-humhol_ht*1000.0)*sfcflow_ratescale,h2osfc(1)*0.5/dtime)
+                     qflx_lat_aqu(3) = qflx_lat_aqu(3) + min(((h2osfc(2)+humhol_ht*humhol_ht_frac*1000.0)-h2osfc(3)-humhol_ht*1000.0)*sfcflow_ratescale,h2osfc(2)*0.5/dtime)
+                     qflx_lat_aqu(2) = qflx_lat_aqu(2) - min(((h2osfc(2)+humhol_ht*humhol_ht_frac*1000.0)-h2osfc(3)-humhol_ht*1000.0)*sfcflow_ratescale,h2osfc(2)*0.5/dtime)
                   endif
                 elseif(h2osfc(2)>0 .and. (h2osfc(2)+humhol_ht*1000.0) > h2osfc(3)) then
                   qflx_lat_aqu(3) = qflx_lat_aqu(3) + min((h2osfc(2)-(h2osfc(3)-humhol_ht*1000.0))*sfcflow_ratescale,h2osfc(2)*0.5/dtime)
@@ -1177,15 +1193,13 @@ contains
                      qflx_lat_aqu(1) = qflx_lat_aqu(1) - min(((h2osfc(1)+humhol_ht*humhol_ht_frac*1000.0)-h2osfc(2)-humhol_ht*1000.0)*sfcflow_ratescale,h2osfc(1)*0.5/dtime)
                   endif
                 endif
-                write(iulog,*), 'qflx_lat_aqu(1) after', qflx_lat_aqu(1), qflx_lat_aqu(2), qflx_lat_aqu(3)
+                write(iulog,*), 'qflx_lat_aqu(1) after', qflx_lat_aqu(1), qflx_lat_aqu(2), qflx_lat_aqu(3), qflx_lat_aqu(4)
 #endif
              endif
 #endif
 
-! End COL4TH ============================================================================================================================================================================================================================================================
 
-
-
+! japg [04-17-2025] End COL4TH ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
 
 
 
@@ -1209,7 +1223,7 @@ contains
              qflx_h2osfc_surf(c) = 0._r8
           endif
 
-       enddo
+      end do
 
        ! No infiltration for impervious urban surfaces
 
@@ -1320,7 +1334,7 @@ contains
           qflx_irrig         =>    col_wf%qflx_irrig         , & ! Input:  [real(r8) (:)   ]  irrigation flux (mm H2O /s)
           qflx_grnd_irrig_col=>    col_wf%qflx_grnd_irrig    , & ! Output: [real(r8) (:)   ]  col real groundwater irrigation flux (mm H2O /s)                                                                                                                                                               
                         
-#if (defined HUM_HOL || defined MARSH || defined COL3RD || COL4TH)
+#if (defined HUM_HOL || defined MARSH || defined COL3RD || defined COL4TH)
           icefrac            =>    soilhydrology_vars%icefrac_col      , &  !Output: [real(r8) (:,:) ]      
           qflx_surf_input    =>    col_wf%qflx_surf_input    , & ! Output: [real(r8) (:,:) ] surface runoff input to hollow (mmH2O/s)
           qflx_lat_aqu       =>    col_wf%qflx_lat_aqu       , & ! Output: [real(r8) (:,:) ] total lateral flow

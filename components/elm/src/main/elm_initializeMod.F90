@@ -129,7 +129,7 @@ contains
     call elm_varcon_init()
     call landunit_varcon_init()
     call ncd_pio_init()
-    call elm_petsc_init()
+    call elm_petsc_init() ! japg [03-31-2025]   ===> this subroutine is inside this model elm_initializeMod.F90
     call init_soil_temperature()
 
     write(iulog,*) 'japg2 ===============================================================================================================================> elm_initialized1'
