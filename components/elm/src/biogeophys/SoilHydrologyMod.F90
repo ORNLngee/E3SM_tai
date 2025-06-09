@@ -58,7 +58,8 @@ contains
     use pftvarcon       , only : humhol_ht_frac
 #endif
 #if (defined COL4TH)
-    use pftvarcon       , only : humhol_ht_frac ! ====================================================================>  japg: I should defined new variables here
+    use pftvarcon       , only : humhol_ht_frac          ! ====================================================================>  japg [06-04-2025]
+    use pftvarcon       , only : humhol_ht_frac2         ! ====================================================================>  japg [06-04-2025]
 #endif
     use SoilWaterMovementMod, only : zengdecker_2009_with_var_soil_thick
     !
@@ -196,7 +197,7 @@ contains
 
 #if (defined COL4TH)
          if (c .eq. 1) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_frac*(zwt(c)))   !at 30cm, hummock saturated at 5% changed to 0.1 TAO
-         if (c .eq. 2) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_frac*(zwt(c)))   !at 30cm, hummock saturated at 5% changed to 0.1 TAO
+         if (c .eq. 2) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_frac2*(zwt(c)))  ! ==========> japg [06-04-2025] 
          if (c .eq. 3) fsat(c) = 1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)))   !at 30cm, hummock saturated at 5% changed to 0.1 TAO
          if (c .eq. 4) fsat(c) = min(1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)-h2osfc(c)/1000.+humhol_ht)), 1._r8) !TAO 0.3 t0 0.1, 0.15 to 0.35 !bsulman: what does 0.15 represent?
 #endif
@@ -225,7 +226,7 @@ contains
 
 #if (defined COL4TH)
             if (c .eq. 1) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_frac*(zwt(c)))   !at 30cm, hummock saturated at 5%
-            if (c .eq. 2) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_frac*(zwt(c)))   !at 30cm, hummock saturated at 5%
+            if (c .eq. 2) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_frac2*(zwt(c)))  ! ==========> japg [06-04-2025]
             if (c .eq. 3) fsat(c) = 1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)))
             if (c .eq. 4) fsat(c) = min(1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)-h2osfc(c)/1000.+humhol_ht)), 1._r8) !TAO 0.3 t 0.1, 0.15 to 0.35
 #endif
@@ -250,8 +251,8 @@ contains
 #endif
 
 #if (defined COL4TH)
-            if (c .eq. 1) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_frac*(zwt(c))) !at 30cm, hummock saturated at 5%
-            if (c .eq. 2) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_frac*(zwt(c))) !at 30cm, hummock saturated at 5%
+            if (c .eq. 1) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_frac*(zwt(c)))     !at 30cm, hummock saturated at 5%
+            if (c .eq. 2) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_frac2*(zwt(c)))    ! ==========> japg [06-04-2025]
             if (c .eq. 3) fsat(c) = 1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)))
             if (c .eq. 4) fsat(c) = min(1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)-h2osfc(c)/1000.+humhol_ht)), 1._r8) !TAO 0.3 t 1.5, 0.15 to 0.35
 #endif
@@ -294,10 +295,10 @@ contains
             else
              qflx_surf(c) = 0._r8   !turn off surface runoff for hollow
             endif
-#elif (defined COL4TH)                
-            if (c .ne. 4) then                                       !japg [4-17-2025] => modifycations are needed here !!!
-               qflx_surf(c) = fcov(c) * qflx_top_soil(c) !TAO
-            else
+#elif (defined COL4TH)
+            if (c .lt. 4) then                                
+            qflx_surf(c) = fcov(c) * qflx_top_soil(c) ! =======================> japg [06-04-2025] ==> compute runoff for columns 1~3
+            else                                      ! =======================> japg [06-04-2025] 
                qflx_surf(c) = 0._r8   !turn off surface runoff for hollow
             endif
 
