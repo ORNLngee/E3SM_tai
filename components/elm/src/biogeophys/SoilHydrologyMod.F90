@@ -446,7 +446,7 @@ contains
 
 #if defined COL4TH
      real(r8) :: ka_hu1, ka_hu2, ka_hu3                    ! hydraulic conductivity terms at saturation for hummock (mmH2O/s)
-     real(r8) :: zwt_hu1, zwt_hu2, zwt_hu3                  ! water table depth for hollows and 2 hummocks (m) [Wei Huang 2022-08-10]
+     real(r8) :: zwt_hu1, zwt_hu2, zwt_hu3                  ! water table depth for hollows and 2 hummocks (m) japg [06-04-2025]
 #endif
 
      integer  :: tide_time_idx
@@ -564,9 +564,9 @@ contains
 #endif
 
 #if defined COL4TH
-       ka_hu1 = 0._r8
-       ka_hu2 = 0._r8
-       ka_hu3 = 0._r8 
+       ka_hu1 = 0._r8  ! =======================> japg [06-10-2025] 
+       ka_hu2 = 0._r8  ! =======================> japg [06-10-2025] 
+       ka_hu3 = 0._r8  ! =======================> japg [06-10-2025] 
 #endif
 
       do fc = 1, num_hydrologyc
@@ -610,8 +610,8 @@ contains
              if (c .eq. 1) then
                qflx_surf_input(1) = 0._r8 !hummock TAO KEEP AT ZERO!!!
                qflx_surf_input(2) = 0._r8 !hummock TAO KEEP AT ZERO!!!
-               qflx_surf_input(3) = 0._r8 !hummock TAO KEEP AT ZERO!!!
-               qflx_surf_input(4) = qflx_surf(2)*(hum_frac/hol_frac)     !hollow TAO
+               qflx_surf_input(3) = 0._r8 !hummock TAO KEEP AT ZERO!!!     ====> japg [06-10-2025]
+               qflx_surf_input(4) = qflx_surf(3)*(hum_frac/hol_frac)     ! ====> japg [06-10-2025]: it should be from qflx_surf(3) instead of qflx_surf(2) 
              end if
              qflx_in_soil(c) = (1._r8 - frac_h2osfc(c)) * (qflx_top_soil(c) - qflx_surf(c) + qflx_surf_input(c))
              qflx_in_h2osfc(c) = frac_h2osfc(c) * (qflx_top_soil(c) - qflx_surf(c) + qflx_surf_input(c))
@@ -1043,7 +1043,7 @@ contains
                                 dzmm(c,j)/sum(dzmm(c,jwt(c)+1:nlevbed))
                   if (c .eq. 2) ka_hu2 = ka_hu2+(hksat(c,j)*s1**(2._r8*bsw(c,j)+3._r8))* &
                                 dzmm(c,j)/sum(dzmm(c,jwt(c)+1:nlevbed))
-                  if (c .eq. 3) ka_hu3 = ka_hu3+(hksat(c,j)*s1**(2._r8*bsw(c,j)+3._r8))* &
+                  if (c .eq. 3) ka_hu3 = ka_hu3+(hksat(c,j)*s1**(2._r8*bsw(c,j)+3._r8))* &   ! japg [06-10-2025]
                                 dzmm(c,j)/sum(dzmm(c,jwt(c)+1:nlevbed))
                   if (c .eq. 4) ka_ho = ka_ho+(hksat(c,j)*s1**(2._r8*bsw(c,j)+3._r8))* &
                                 dzmm(c,j)/sum(dzmm(c,jwt(c)+1:nlevbed))
@@ -1173,27 +1173,84 @@ contains
                 write(iulog,*), 'qflx_lat_aqu(c)', qflx_lat_aqu(1), qflx_lat_aqu(2), qflx_lat_aqu(3)
                 write(iulog,*), 'h2osfc(c)', h2osfc(1), h2osfc(2), h2osfc(3)
                 ! If flooded water surface of one column is higher than the other, add faster flow since aquifer transfer (ka parameters) is slow
-                if(h2osfc(4)>0 .and. h2osfc(4)>(h2osfc(3)+humhol_ht*1000.0)) then
-                  qflx_lat_aqu(4) = qflx_lat_aqu(4) - min((h2osfc(4)-(h2osfc(3)+humhol_ht*1000.0))*sfcflow_ratescale,h2osfc(4)*0.5/dtime)
-                  qflx_lat_aqu(3) = qflx_lat_aqu(3) + min((h2osfc(3)-(h2osfc(3)+humhol_ht*1000.0))*sfcflow_ratescale,h2osfc(4)*0.5/dtime)
-                  if (h2osfc(3)>0 .and. (h2osfc(2)+humhol_ht*humhol_ht_frac*1000.0) < h2osfc(3)+humhol_ht*1000.0) then
-                     qflx_lat_aqu(3) = qflx_lat_aqu(3) - min((h2osfc(3)+humhol_ht*1000.0-(h2osfc(2)+humhol_ht*humhol_ht_frac*1000.0))*sfcflow_ratescale,h2osfc(3)*0.5/dtime)
-                     qflx_lat_aqu(1) = qflx_lat_aqu(2) + min((h2osfc(3)+humhol_ht*1000.0-(h2osfc(2)+humhol_ht*humhol_ht_frac*1000.0))*sfcflow_ratescale,h2osfc(3)*0.5/dtime)
-                  elseif (h2osfc(1)>0 .and. (h2osfc(1)+humhol_ht*humhol_ht_frac*1000.0) > h2osfc(2)+humhol_ht*1000.0) then
-                     qflx_lat_aqu(3) = qflx_lat_aqu(3) + min(((h2osfc(2)+humhol_ht*humhol_ht_frac*1000.0)-h2osfc(3)-humhol_ht*1000.0)*sfcflow_ratescale,h2osfc(2)*0.5/dtime)
-                     qflx_lat_aqu(2) = qflx_lat_aqu(2) - min(((h2osfc(2)+humhol_ht*humhol_ht_frac*1000.0)-h2osfc(3)-humhol_ht*1000.0)*sfcflow_ratescale,h2osfc(2)*0.5/dtime)
+               
+                  ! japg [06-10-2025]: Flow interaction between columns ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+
+                  if (h2osfc(4) > 0.0 .and. h2osfc(4) > (h2osfc(3) + humhol_ht*1000.0)) then
+                     ! Flow from 4 -> 3
+                     qflx_lat_aqu(4) = qflx_lat_aqu(4) - min((h2osfc(4) - (h2osfc(3) + humhol_ht*1000.0)) * sfcflow_ratescale, h2osfc(4)*0.5/dtime)
+                     qflx_lat_aqu(3) = qflx_lat_aqu(3) + min((h2osfc(4) - (h2osfc(3) + humhol_ht*1000.0)) * sfcflow_ratescale, h2osfc(4)*0.5/dtime)
+
+                     if (h2osfc(3) > 0.0 .and. (h2osfc(2) + humhol_ht*humhol_ht_frac*1000.0) < h2osfc(3) + humhol_ht*1000.0) then
+                        ! Flow from 3 -> 2
+                        qflx_lat_aqu(3) = qflx_lat_aqu(3) - min((h2osfc(3) + humhol_ht*1000.0 - (h2osfc(2) + humhol_ht*humhol_ht_frac*1000.0)) * sfcflow_ratescale, h2osfc(3)*0.5/dtime)
+                        qflx_lat_aqu(2) = qflx_lat_aqu(2) + min((h2osfc(3) + humhol_ht*1000.0 - (h2osfc(2) + humhol_ht*humhol_ht_frac*1000.0)) * sfcflow_ratescale, h2osfc(3)*0.5/dtime)
+
+                        if (h2osfc(2) > 0.0 .and. (h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0) < h2osfc(2) + humhol_ht*1000.0) then
+                           ! Flow from 2 -> 1
+                           qflx_lat_aqu(2) = qflx_lat_aqu(2) - min((h2osfc(2) + humhol_ht*1000.0 - (h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0)) * sfcflow_ratescale, h2osfc(2)*0.5/dtime)
+                           qflx_lat_aqu(1) = qflx_lat_aqu(1) + min((h2osfc(2) + humhol_ht*1000.0 - (h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0)) * sfcflow_ratescale, h2osfc(2)*0.5/dtime)
+                        elseif (h2osfc(1) > 0.0 .and. (h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0) > h2osfc(2) + humhol_ht*1000.0) then
+                           ! Flow from 1 -> 2
+                           qflx_lat_aqu(2) = qflx_lat_aqu(2) + min(((h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0) - h2osfc(2) - humhol_ht*1000.0) * sfcflow_ratescale, h2osfc(1)*0.5/dtime)
+                           qflx_lat_aqu(1) = qflx_lat_aqu(1) - min(((h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0) - h2osfc(2) - humhol_ht*1000.0) * sfcflow_ratescale, h2osfc(1)*0.5/dtime)
+                        endif
+
+                     elseif (h2osfc(2) > 0.0 .and. (h2osfc(2) + humhol_ht*humhol_ht_frac*1000.0) > h2osfc(3) + humhol_ht*1000.0) then
+                        ! Flow from 2 -> 3
+                        qflx_lat_aqu(3) = qflx_lat_aqu(3) + min(((h2osfc(2) + humhol_ht*humhol_ht_frac*1000.0) - h2osfc(3) - humhol_ht*1000.0) * sfcflow_ratescale, h2osfc(2)*0.5/dtime)
+                        qflx_lat_aqu(2) = qflx_lat_aqu(2) - min(((h2osfc(2) + humhol_ht*humhol_ht_frac*1000.0) - h2osfc(3) - humhol_ht*1000.0) * sfcflow_ratescale, h2osfc(2)*0.5/dtime)
+
+                        if (h2osfc(1) > 0.0 .and. (h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0) > h2osfc(2) + humhol_ht*1000.0) then
+                           ! Flow from 1 -> 2
+                           qflx_lat_aqu(2) = qflx_lat_aqu(2) + min(((h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0) - h2osfc(2) - humhol_ht*1000.0) * sfcflow_ratescale, h2osfc(1)*0.5/dtime)
+                           qflx_lat_aqu(1) = qflx_lat_aqu(1) - min(((h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0) - h2osfc(2) - humhol_ht*1000.0) * sfcflow_ratescale, h2osfc(1)*0.5/dtime)
+                        elseif (h2osfc(2) > 0.0 .and. (h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0) < h2osfc(2) + humhol_ht*1000.0) then
+                           ! Flow from 2 -> 1
+                           qflx_lat_aqu(2) = qflx_lat_aqu(2) - min((h2osfc(2) + humhol_ht*1000.0 - (h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0)) * sfcflow_ratescale, h2osfc(2)*0.5/dtime)
+                           qflx_lat_aqu(1) = qflx_lat_aqu(1) + min((h2osfc(2) + humhol_ht*1000.0 - (h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0)) * sfcflow_ratescale, h2osfc(2)*0.5/dtime)
+                        endif
+                     endif
+
+                  elseif (h2osfc(3) > 0.0 .and. (h2osfc(3) + humhol_ht*1000.0) > h2osfc(4)) then
+                     ! Flow from 3 -> 4
+                     qflx_lat_aqu(4) = qflx_lat_aqu(4) + min((h2osfc(3) - (h2osfc(4) - humhol_ht*1000.0)) * sfcflow_ratescale, h2osfc(3)*0.5/dtime)
+                     qflx_lat_aqu(3) = qflx_lat_aqu(3) - min((h2osfc(3) - (h2osfc(4) - humhol_ht*1000.0)) * sfcflow_ratescale, h2osfc(3)*0.5/dtime)
+
+                     if (h2osfc(3) > 0.0 .and. (h2osfc(2) + humhol_ht*humhol_ht_frac*1000.0) < h2osfc(3) + humhol_ht*1000.0) then
+                        ! Flow from 3 -> 2
+                        qflx_lat_aqu(3) = qflx_lat_aqu(3) - min((h2osfc(3) + humhol_ht*1000.0 - (h2osfc(2) + humhol_ht*humhol_ht_frac*1000.0)) * sfcflow_ratescale, h2osfc(3)*0.5/dtime)
+                        qflx_lat_aqu(2) = qflx_lat_aqu(2) + min((h2osfc(3) + humhol_ht*1000.0 - (h2osfc(2) + humhol_ht*humhol_ht_frac*1000.0)) * sfcflow_ratescale, h2osfc(3)*0.5/dtime)
+
+                        if (h2osfc(2) > 0.0 .and. (h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0) < h2osfc(2) + humhol_ht*1000.0) then
+                           ! Flow from 2 -> 1
+                           qflx_lat_aqu(2) = qflx_lat_aqu(2) - min((h2osfc(2) + humhol_ht*1000.0 - (h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0)) * sfcflow_ratescale, h2osfc(2)*0.5/dtime)
+                           qflx_lat_aqu(1) = qflx_lat_aqu(1) + min((h2osfc(2) + humhol_ht*1000.0 - (h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0)) * sfcflow_ratescale, h2osfc(2)*0.5/dtime)
+                        elseif (h2osfc(1) > 0.0 .and. (h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0) > h2osfc(2) + humhol_ht*1000.0) then
+                           ! Flow from 1 -> 2
+                           qflx_lat_aqu(2) = qflx_lat_aqu(2) + min(((h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0) - h2osfc(2) - humhol_ht*1000.0) * sfcflow_ratescale, h2osfc(1)*0.5/dtime)
+                           qflx_lat_aqu(1) = qflx_lat_aqu(1) - min(((h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0) - h2osfc(2) - humhol_ht*1000.0) * sfcflow_ratescale, h2osfc(1)*0.5/dtime)
+                        endif
+
+                     elseif (h2osfc(2) > 0.0 .and. (h2osfc(2) + humhol_ht*humhol_ht_frac*1000.0) > h2osfc(3) + humhol_ht*1000.0) then
+                        ! Flow from 2 -> 3
+                        qflx_lat_aqu(3) = qflx_lat_aqu(3) + min(((h2osfc(2) + humhol_ht*humhol_ht_frac*1000.0) - h2osfc(3) - humhol_ht*1000.0) * sfcflow_ratescale, h2osfc(2)*0.5/dtime)
+                        qflx_lat_aqu(2) = qflx_lat_aqu(2) - min(((h2osfc(2) + humhol_ht*humhol_ht_frac*1000.0) - h2osfc(3) - humhol_ht*1000.0) * sfcflow_ratescale, h2osfc(2)*0.5/dtime)
+
+                        if (h2osfc(1) > 0.0 .and. (h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0) > h2osfc(2) + humhol_ht*1000.0) then
+                           ! Flow from 1 -> 2
+                           qflx_lat_aqu(2) = qflx_lat_aqu(2) + min(((h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0) - h2osfc(2) - humhol_ht*1000.0) * sfcflow_ratescale, h2osfc(1)*0.5/dtime)
+                           qflx_lat_aqu(1) = qflx_lat_aqu(1) - min(((h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0) - h2osfc(2) - humhol_ht*1000.0) * sfcflow_ratescale, h2osfc(1)*0.5/dtime)
+                        elseif (h2osfc(2) > 0.0 .and. (h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0) < h2osfc(2) + humhol_ht*1000.0) then
+                           ! Flow from 2 -> 1
+                           qflx_lat_aqu(2) = qflx_lat_aqu(2) - min((h2osfc(2) + humhol_ht*1000.0 - (h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0)) * sfcflow_ratescale, h2osfc(2)*0.5/dtime)
+                           qflx_lat_aqu(1) = qflx_lat_aqu(1) + min((h2osfc(2) + humhol_ht*1000.0 - (h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0)) * sfcflow_ratescale, h2osfc(2)*0.5/dtime)
+                        endif
+                     endif
                   endif
-                elseif(h2osfc(2)>0 .and. (h2osfc(2)+humhol_ht*1000.0) > h2osfc(3)) then
-                  qflx_lat_aqu(3) = qflx_lat_aqu(3) + min((h2osfc(2)-(h2osfc(3)-humhol_ht*1000.0))*sfcflow_ratescale,h2osfc(2)*0.5/dtime)
-                  qflx_lat_aqu(2) = qflx_lat_aqu(2) - min((h2osfc(2)-(h2osfc(3)-humhol_ht*1000.0))*sfcflow_ratescale,h2osfc(2)*0.5/dtime)
-                  if (h2osfc(2)>0 .and. (h2osfc(1)+humhol_ht*humhol_ht_frac*1000.0) < h2osfc(2)+humhol_ht*1000.0) then
-                     qflx_lat_aqu(2) = qflx_lat_aqu(2) - min((h2osfc(2)+humhol_ht*1000.0-(h2osfc(1)+humhol_ht*humhol_ht_frac*1000.0))*sfcflow_ratescale,h2osfc(2)*0.5/dtime)
-                     qflx_lat_aqu(1) = qflx_lat_aqu(1) + min((h2osfc(2)+humhol_ht*1000.0-(h2osfc(1)+humhol_ht*humhol_ht_frac*1000.0))*sfcflow_ratescale,h2osfc(2)*0.5/dtime)
-                  elseif (h2osfc(1)>0 .and. (h2osfc(1)+humhol_ht*humhol_ht_frac*1000.0) > h2osfc(2)+humhol_ht*1000.0) then
-                     qflx_lat_aqu(2) = qflx_lat_aqu(2) + min(((h2osfc(1)+humhol_ht*humhol_ht_frac*1000.0)-h2osfc(2)-humhol_ht*1000.0)*sfcflow_ratescale,h2osfc(1)*0.5/dtime)
-                     qflx_lat_aqu(1) = qflx_lat_aqu(1) - min(((h2osfc(1)+humhol_ht*humhol_ht_frac*1000.0)-h2osfc(2)-humhol_ht*1000.0)*sfcflow_ratescale,h2osfc(1)*0.5/dtime)
-                  endif
-                endif
+
+                 ! japg [06-10-2025]: Flow interaction between columns ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
+
                 write(iulog,*), 'qflx_lat_aqu(1) after', qflx_lat_aqu(1), qflx_lat_aqu(2), qflx_lat_aqu(3), qflx_lat_aqu(4)
 #endif
              endif
