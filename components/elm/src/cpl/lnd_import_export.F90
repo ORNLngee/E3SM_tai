@@ -79,7 +79,8 @@ contains
     real(r8) :: swndf, swndr, swvdf, swvdr, ratio_rvrf, frac, q
     real(r8) :: thiscosz, avgcosz, szenith
     integer  :: swrad_period_len, swrad_period_start, thishr, thismin
-    real(r8) :: timetemp(2)
+    real(r8) :: timetemp(49)
+    integer  :: itemp
     real(r8) :: latixy(500000), longxy(500000)
     integer ::  ierr, varid, dimid, yr, mon, day, tod, nindex(2), caldaym(13)
     integer ::  ncid, met_ncids(14), mask_ncid, thisncid, ng, tm
@@ -333,7 +334,7 @@ contains
               atm2lnd_vars%endyear_met_spinup = 1969
           else if (use_daymet) then 
               atm2lnd_vars%startyear_met      = 1980
-              atm2lnd_vars%endyear_met_spinup = atm2lnd_vars%endyear_met_trans
+              atm2lnd_vars%endyear_met_spinup = min(2000,atm2lnd_vars%endyear_met_trans)
           end if
 
           nyears_spinup = atm2lnd_vars%endyear_met_spinup - &
@@ -436,6 +437,17 @@ contains
             else if (atm2lnd_vars%metsource == 5) then 
                     !metdata_fname = 'WCYCL1850S.ne30_' // trim(metvars(v)) // '_0076-0100_z' // zst(2:3) // '.nc'
                     metdata_fname = 'CBGC1850S.ne30_' // trim(metvars(v)) // '_0566-0590_z' // zst(2:3) // '.nc'
+            else if (atm2lnd_vars%metsource == 6) then
+                ! CRUJRA v2.3
+                metdata_fname = 'CRUJRAV2.3.c2023.0.5x0.5_' // trim(metvars(v)) // '_1901-2021_z' // zst(2:3) // '.nc'
+            else if (atm2lnd_vars%metsource == 7) then
+                ! ERA5
+                if (use_daymet .and. (index(metdata_type, 'daymet4') .gt. 0) ) then
+                   !daymet v4 with ERA5 v2023 for NA with user-defined zone-mappings.txt
+                    metdata_fname = 'Daymet_ERA5.1km_' // trim(metvars(v)) // '_1980-2023_z' // zst(2:3) // '.nc'
+                else
+                    metdata_fname = 'ERA5_' // trim(metvars(v)) // '_1950-2024_z' // zst(2:3) // '.nc'
+                end if
             end if
   
             ierr = nf90_open(trim(metdata_bypass) // '/' // trim(metdata_fname), NF90_NOWRITE, met_ncids(v))
@@ -447,11 +459,17 @@ contains
             ierr = nf90_Inquire_Dimension(met_ncids(v), dimid, len = atm2lnd_vars%timelen(v))
 
             starti(1) = 1
-            counti(1) = 2
+            counti(1) = 49
             ierr = nf90_inq_varid(met_ncids(v), 'DTIME', varid)
             ierr = nf90_get_var(met_ncids(v), varid, timetemp, starti(1:1), counti(1:1))   
-            atm2lnd_vars%timeres(v)        = (timetemp(2)-timetemp(1))*24._r8
-            atm2lnd_vars%npf(v)            = 86400d0*(timetemp(2)-timetemp(1))/get_step_size()  
+            atm2lnd_vars%timeres(v)        = 0._r8
+            do itemp=2,counti(1)
+               atm2lnd_vars%timeres(v)     = atm2lnd_vars%timeres(v)+ &
+                                             (timetemp(itemp)-timetemp(itemp-1))*24._r8
+            end do
+            atm2lnd_vars%timeres(v)        = atm2lnd_vars%timeres(v)/(counti(1)-1.0_r8)
+            atm2lnd_vars%npf(v)            = 3600d0*atm2lnd_vars%timeres(v)/get_step_size()
+
             atm2lnd_vars%timelen_spinup(v) = nyears_spinup*(365*nint(24./atm2lnd_vars%timeres(v)))
     
             ierr = nf90_inq_varid(met_ncids(v), trim(metvars(v)), varid)
@@ -537,8 +555,12 @@ contains
               atm2lnd_vars%tindex(g,v,1) = atm2lnd_vars%timelen(v)
               if (yr .le. atm2lnd_vars%endyear_met_spinup) atm2lnd_vars%tindex(g,v,1) = atm2lnd_vars%timelen_spinup(v)
              end if
+
           end do    !end variable loop        
+
+        !
         else
+          ! met data loaded
           do v=1,met_nvars
             if (atm2lnd_vars%npf(v) - 1._r8 .gt. 1e-3) then 
               if (v .eq. 4 .or. v .eq. 5 .or. (v .ge. 8 .and. v .le. 13)) then    !rad/Precipitation
@@ -547,17 +569,20 @@ contains
                   atm2lnd_vars%tindex(g,v,2) = atm2lnd_vars%tindex(g,v,2)+1
                 end if
               else  
-                if (mod(tod/get_step_size()-1,nint(atm2lnd_vars%npf(v))) <= atm2lnd_vars%npf(v)/2._r8 .and. &
-                    mod(tod/get_step_size(),nint(atm2lnd_vars%npf(v))) > atm2lnd_vars%npf(v)/2._r8) then 
+                if ( (mod(tod/get_step_size(),nint(atm2lnd_vars%npf(v)))-atm2lnd_vars%npf(v)/2._r8) .ge. -1.e-3 .and. &
+                     (mod(tod/get_step_size()+1,nint(atm2lnd_vars%npf(v)))-atm2lnd_vars%npf(v)/2._r8) .lt. 0. ) then
                   atm2lnd_vars%tindex(g,v,1) = atm2lnd_vars%tindex(g,v,1)+1
                   atm2lnd_vars%tindex(g,v,2) = atm2lnd_vars%tindex(g,v,2)+1
                 end if
               end if
+
             else
+
               atm2lnd_vars%tindex(g,v,1) = atm2lnd_vars%tindex(g,v,1)+nint(1/atm2lnd_vars%npf(v))
               atm2lnd_vars%tindex(g,v,2) = atm2lnd_vars%tindex(g,v,2)+nint(1/atm2lnd_vars%npf(v))  
             end if
 
+            ! cycling years of data
             if (const_climate_hist .or. yr .le. atm2lnd_vars%startyear_met) then
               if (atm2lnd_vars%tindex(g,v,1) .gt. atm2lnd_vars%timelen_spinup(v)) atm2lnd_vars%tindex(g,v,1) = 1
               if (atm2lnd_vars%tindex(g,v,2) .gt. atm2lnd_vars%timelen_spinup(v)) atm2lnd_vars%tindex(g,v,2) = 1

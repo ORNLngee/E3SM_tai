@@ -1714,7 +1714,8 @@ contains
 		               if (use_fates .or. use_hydrstress) then
                       this%h2osoi_vol(c,j) = 0.70_r8*watsat_input(c,j) !0.15_r8 to avoid very dry conditions that cause errors in FATES
                    else
-                      this%h2osoi_vol(c,j) = 0.15_r8
+			!BAM 9/25 edited from this%h2osoi_vol(c,j) = 0.15_r8 to this%h2osoi_vol(c,j) = 0.85_r8*watsat_input(c,j) per Katrina B's advice so soil is at 85% sat for spinup and permafrost can form more easily
+                      this%h2osoi_vol(c,j) = 0.85_r8*watsat_input(c,j)
                    endif
                 endif
              end do
