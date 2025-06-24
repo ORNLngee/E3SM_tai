@@ -387,6 +387,15 @@ contains
    !   real(r8) :: h2osfc_tide
      real(r8) :: h2osfc_before
      !-----------------------------------------------------------------------
+     ! BAM additions for gradual snow/ice control (11/12/25)
+     !-----------------------------------------------------------------------
+     real(r8), parameter :: snow_full  = 0.10_r8   ! [m] snow depth below which full tidal forcing allowed
+     real(r8), parameter :: snow_none  = 0.15_r8   ! [m] snow depth above which no forcing
+     real(r8), parameter :: ice_free   = 0.25_r8   ! [-] icefrac below which full forcing
+     real(r8), parameter :: ice_frozen = 0.40_r8   ! [-] icefrac above which no forcing
+
+     real(r8) :: snow_factor, ice_factor, forcing_factor
+     !-----------------------------------------------------------------------
 
      associate(                                                    &
           snl                  =>    col_pp%snl                  , & ! Input:  [integer  (:)   ]  minus number of snow layers
@@ -767,29 +776,65 @@ contains
 
                ka_hu = max(ka_hu, 1e-5_r8)
 
-               !DMR 12/4/2015
-               if (icefrac(c,min(jwt(c)+1,nlevbed)) .ge. .90_r8) then
-                  !turn off lateral transport if any ice is present at or below,
+               !-----------------------------------------------------------------------
+               ! Gradual snow + ice control on tidal water forcing for polygonal tundra (BAM 11/12/25)
+               !-----------------------------------------------------------------------
+               
+               ! safety precaution: ensure qflx_lat_aqu is reset to 0 before calculating just in case
+               qflx_lat_aqu(c) = 0._r8
+               
+               ! Snow factor ramps from 1 to 0 as snow depth increases from snow_full to snow_none
+               if (snow_depth(c) <= snow_full) then
+                  snow_factor = 1._r8
+               else if (snow_depth(c) >= snow_none) then
+                  snow_factor = 0._r8
+               else
+                  snow_factor = 1._r8 - (snow_depth(c) - snow_full) / (snow_none - snow_full)
+               endif
+
+               ! Ice factor ramps from 1 to 0 as ice fraction increases from ice_free to ice_frozen
+               if (icefrac(c,2) <= ice_free) then
+                  ice_factor = 1._r8
+               else if (icefrac(c,2) >= ice_frozen) then
+                  ice_factor = 0._r8
+               else
+                  ice_factor = 1._r8 - (icefrac(c,2) - ice_free) / (ice_frozen - ice_free)
+               endif
+
+               ! Combined forcing factor (0 = off, 1 = full forcing)
+               forcing_factor = max(0._r8, min(1._r8, snow_factor * ice_factor))
+
+               !compute base lateral flux before applying the forcing_factor adjustments
+               qflx_lat_aqu(c) = 2._r8 * ka_hu * (h2osfc_tide(c)/1000._r8 - (h2osfc(c)/1000._r8 - zwt(c))) / max(dist_from_stream(c), 1.0_r8)
+
+               ! Apply forcing factor to calculated base lateral subsurface flux
+               ! this scales both inflow and outflow (meaning can be +-)
+               !qflx_lat_aqu(c) = forcing_factor * qflx_lat_aqu(c)!if forcing_factor is small but non-0 having this here dramtically weakens base flux before applying the below surface-based correction terms
+               ! For dry polygons (negative tide height), only allow drainage, not inflow
+               if (h2osfc_tide(c) < 0._r8 .and. qflx_lat_aqu(c) > 0._r8) then
                   qflx_lat_aqu(c) = 0._r8
-               else
-                  qflx_lat_aqu(c) =  2._r8*ka_hu * (h2osfc_tide(c)/1000._r8 - (h2osfc(c)/1000._r8 - zwt(c))) / max(dist_from_stream(c), 1.0_r8)
                endif
-             
-                ! If flooded water surface of one column is higher than the other, add faster flow since aquifer transfer (ka parameters) is slow
-               ! Maybe this should be going into qflx_surf instead of qflx_lat_aqu? 
-               ! Skip this if there is snow on the ground in case it messes things up?
-               if(snow_depth(c) < 0.01_r8) then
-                if(h2osfc_tide(c)>0 .and. h2osfc_tide(c)>h2osfc(c)) then
-                  qflx_lat_aqu(c) = qflx_lat_aqu(c) + min((h2osfc_tide(c)-h2osfc(c))*sfcflow_ratescale,h2osfc_tide(c)*0.5/dtime)
-                elseif(h2osfc(c)>0 .and. h2osfc(c) > h2osfc_tide(c)) then
-                  qflx_lat_aqu(c) = qflx_lat_aqu(c) - min((h2osfc(c)-h2osfc_tide(c))*sfcflow_ratescale,h2osfc(c)*0.5/dtime)
-                endif
+
+               ! --- Apply gradual control to lateral water flux ---
+               if (forcing_factor > 0._r8) then
+                  if (h2osfc_tide(c) > 0._r8 .and. h2osfc_tide(c) > h2osfc(c)) then
+                     qflx_lat_aqu(c) = qflx_lat_aqu(c) + forcing_factor * &
+                        min((h2osfc_tide(c) - h2osfc(c)) * sfcflow_ratescale, h2osfc_tide(c) * 0.5_r8 / dtime)
+                  else if (h2osfc(c) > 0._r8 .and. h2osfc(c) > h2osfc_tide(c)) then
+                     qflx_lat_aqu(c) = qflx_lat_aqu(c)- &
+                        min((h2osfc(c) - h2osfc_tide(c)) * sfcflow_ratescale, h2osfc(c) * 0.5_r8 / dtime)
+                  else
+                     qflx_lat_aqu(c) = 0._r8
+                  endif
                else
-                  ! Get rid of surface water when there's snow
-                  qflx_lat_aqu(c) = - min((h2osfc(c))*sfcflow_ratescale,h2osfc(c)*0.5/dtime)
+                  ! Frozen or deep snow OR no tidal forcing connection (dry polygons) -> drain slowly (prevent pond buildup)
+                  if (h2osfc(c) > 0._r8) then
+                     qflx_lat_aqu(c) = - min(h2osfc(c) * sfcflow_ratescale, h2osfc(c) * 0.5_r8 / dtime)
+                  else
+                     qflx_lat_aqu(c) = 0._r8
+                  endif
                endif
-               !  write(iulog,*), 'qflx_lat_aqu(c) after', qflx_lat_aqu(c)               
-               !  write(iulog,*), 'h2osfc(c) after', h2osfc(c) 
+                
 #endif
 
 
