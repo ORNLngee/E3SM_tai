@@ -1080,9 +1080,9 @@ contains
     call ncd_io('humhol_ht', humhol_ht, 'read', ncid, readvar=readv, posNOTonfile=.true.)
     if ( .not. readv) humhol_ht = 0.15_r8
     call ncd_io('humhol_ht_frac', humhol_ht_frac, 'read', ncid, readvar=readv, posNOTonfile=.true.)
-    if ( .not. readv) humhol_ht_frac = 1.0_r8
+    if ( .not. readv) humhol_ht_frac = 1.4_r8
     call ncd_io('humhol_ht_frac', humhol_ht_frac2, 'read', ncid, readvar=readv, posNOTonfile=.true.)    ! japg [06-04-2025] 
-    if ( .not. readv) humhol_ht_frac2 = 1.0_r8                                                          ! japg [06-04-2025] 
+    if ( .not. readv) humhol_ht_frac2 = 1.2_r8                                                          ! japg [06-04-2025] 
     call ncd_io('humhol_dist', humhol_dist, 'read', ncid, readvar=readv, posNOTonfile=.true.)
     if ( .not. readv) humhol_dist = 1.0_r8
     call ncd_io('hum_frac', hum_frac, 'read', ncid, readvar=readv, posNOTonfile=.true.)

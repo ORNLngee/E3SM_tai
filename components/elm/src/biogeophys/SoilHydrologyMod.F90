@@ -378,7 +378,7 @@ contains
 #endif
 
 #if (defined COL4TH)
-     use pftvarcon        , only : humhol_ht_frac
+     use pftvarcon        , only : humhol_ht_frac, humhol_ht_frac2
 #endif
 
 #if (defined MARSH || defined COL3RD || defined COL4TH)
@@ -1181,10 +1181,10 @@ contains
                      qflx_lat_aqu(4) = qflx_lat_aqu(4) - min((h2osfc(4) - (h2osfc(3) + humhol_ht*1000.0)) * sfcflow_ratescale, h2osfc(4)*0.5/dtime)
                      qflx_lat_aqu(3) = qflx_lat_aqu(3) + min((h2osfc(4) - (h2osfc(3) + humhol_ht*1000.0)) * sfcflow_ratescale, h2osfc(4)*0.5/dtime)
 
-                     if (h2osfc(3) > 0.0 .and. (h2osfc(2) + humhol_ht*humhol_ht_frac*1000.0) < h2osfc(3) + humhol_ht*1000.0) then
+                     if (h2osfc(3) > 0.0 .and. (h2osfc(2) + humhol_ht*humhol_ht_frac2*1000.0) < h2osfc(3) + humhol_ht*1000.0) then
                         ! Flow from 3 -> 2
-                        qflx_lat_aqu(3) = qflx_lat_aqu(3) - min((h2osfc(3) + humhol_ht*1000.0 - (h2osfc(2) + humhol_ht*humhol_ht_frac*1000.0)) * sfcflow_ratescale, h2osfc(3)*0.5/dtime)
-                        qflx_lat_aqu(2) = qflx_lat_aqu(2) + min((h2osfc(3) + humhol_ht*1000.0 - (h2osfc(2) + humhol_ht*humhol_ht_frac*1000.0)) * sfcflow_ratescale, h2osfc(3)*0.5/dtime)
+                        qflx_lat_aqu(3) = qflx_lat_aqu(3) - min((h2osfc(3) + humhol_ht*1000.0 - (h2osfc(2) + humhol_ht*humhol_ht_frac2*1000.0)) * sfcflow_ratescale, h2osfc(3)*0.5/dtime)
+                        qflx_lat_aqu(2) = qflx_lat_aqu(2) + min((h2osfc(3) + humhol_ht*1000.0 - (h2osfc(2) + humhol_ht*humhol_ht_frac2*1000.0)) * sfcflow_ratescale, h2osfc(3)*0.5/dtime)
 
                         if (h2osfc(2) > 0.0 .and. (h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0) < h2osfc(2) + humhol_ht*1000.0) then
                            ! Flow from 2 -> 1
@@ -1196,10 +1196,10 @@ contains
                            qflx_lat_aqu(1) = qflx_lat_aqu(1) - min(((h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0) - h2osfc(2) - humhol_ht*1000.0) * sfcflow_ratescale, h2osfc(1)*0.5/dtime)
                         endif
 
-                     elseif (h2osfc(2) > 0.0 .and. (h2osfc(2) + humhol_ht*humhol_ht_frac*1000.0) > h2osfc(3) + humhol_ht*1000.0) then
+                     elseif (h2osfc(2) > 0.0 .and. (h2osfc(2) + humhol_ht*humhol_ht_frac2*1000.0) > h2osfc(3) + humhol_ht*1000.0) then
                         ! Flow from 2 -> 3
-                        qflx_lat_aqu(3) = qflx_lat_aqu(3) + min(((h2osfc(2) + humhol_ht*humhol_ht_frac*1000.0) - h2osfc(3) - humhol_ht*1000.0) * sfcflow_ratescale, h2osfc(2)*0.5/dtime)
-                        qflx_lat_aqu(2) = qflx_lat_aqu(2) - min(((h2osfc(2) + humhol_ht*humhol_ht_frac*1000.0) - h2osfc(3) - humhol_ht*1000.0) * sfcflow_ratescale, h2osfc(2)*0.5/dtime)
+                        qflx_lat_aqu(3) = qflx_lat_aqu(3) + min(((h2osfc(2) + humhol_ht*humhol_ht_frac2*1000.0) - h2osfc(3) - humhol_ht*1000.0) * sfcflow_ratescale, h2osfc(2)*0.5/dtime)
+                        qflx_lat_aqu(2) = qflx_lat_aqu(2) - min(((h2osfc(2) + humhol_ht*humhol_ht_frac2*1000.0) - h2osfc(3) - humhol_ht*1000.0) * sfcflow_ratescale, h2osfc(2)*0.5/dtime)
 
                         if (h2osfc(1) > 0.0 .and. (h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0) > h2osfc(2) + humhol_ht*1000.0) then
                            ! Flow from 1 -> 2
