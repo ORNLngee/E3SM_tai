@@ -800,6 +800,8 @@ contains
 
          if (season_decid(ivt(p)) == 1._r8) then
 
+            soilt = t_soisno(c,3)
+            crit_onset_gdd = exp(crit_gdd1(ivt(p)) + crit_gdd2(ivt(p))*(annavg_t2m(p) - SHR_CONST_TKFRZ))
             ! set background litterfall rate, background transfer rate, and
             ! long growing season factor to 0 for seasonal deciduous types
             bglfr_leaf(p) = 0._r8
@@ -1140,12 +1142,15 @@ contains
     associate(                                                                                             &
          ivt                                 =>    veg_pp%itype                                             , & ! Input:  [integer   (:)   ]  pft vegetation type
          dayl                                =>    grc_pp%dayl                                              , & ! Input:  [real(r8)  (:)   ]  daylength (s)
+         prev_dayl                           =>    grc_pp%prev_dayl                                         , & ! Input:  [real(r8)  (:)   ]  daylength from previous time step (s)
 
          leaf_long                           =>    veg_vp%leaf_long                                  , & ! Input:  [real(r8)  (:)   ]  leaf longevity (yrs)
          froot_long                          =>    veg_vp%froot_long                                 , & ! Input:  [real(r8)  (:)   ]  fine root longevity (yrs)
          woody                               =>    veg_vp%woody                                      , & ! Input:  [real(r8)  (:)   ]  woody lifeform flag (0 = non-woody, 1 = tree, 2 = shrub)
          stress_decid                        =>    veg_vp%stress_decid                               , & ! Input:  [real(r8)  (:)   ]  binary flag for stress-deciduous leaf habit (0 or 1)
 
+         crit_gdd1                           =>    veg_vp%crit_gdd1                                  , & ! Input:  [real(r8) (:) ] critical GDD intercept (at t = 0)
+         crit_gdd2                           =>    veg_vp%crit_gdd2                                  , & ! Input:  [real(r8) (:) ] critical GDD intercept (at t = 0)
          soilpsi                             =>    soilstate_vars%soilpsi_col                            , & ! Input:  [real(r8)  (:,:) ]  soil water potential in each soil layer (MPa)
 
          t_soisno                            =>    col_es%t_soisno                         , & ! Input:  [real(r8)  (:,:) ]  soil temperature (Kelvin)  (-nlevsno+1:nlevgrnd)
@@ -1271,9 +1276,7 @@ contains
             psi = soilpsi(c,3)
 
             ! onset gdd sum from Biome-BGC, v4.1.2
-            crit_onset_gdd = exp(4.8_r8 + 0.13_r8*(annavg_t2m(p) - SHR_CONST_TKFRZ))
-
-
+            crit_onset_gdd = exp(crit_gdd1(ivt(p)) + crit_gdd2(ivt(p))*(annavg_t2m(p) - SHR_CONST_TKFRZ))
             ! update offset_counter and test for the end of the offset period
             if (offset_flag(p) == 1._r8) then
                ! decrement counter for offset period
@@ -1496,7 +1499,14 @@ contains
                   offset_fdd(p) = offset_fdd(p) + fracday
 
                   ! if freezing degree day sum is greater than critical value, initiate offset
-                  if (offset_fdd(p) > crit_offset_fdd .and. onset_flag(p) == 0._r8) offset_flag(p) = 1._r8
+                  if (offset_fdd(p) > crit_offset_fdd .and. onset_flag(p) == 0._r8) then
+                    ! only allow freezing induced offset during winter period
+                    ! this is to avoid early spring frosting caused offset/dormant phenological sequence (currently it lasts about 80 days)
+                    ! (TODO: need to add something for frosting death and regrowth)
+                    if (dayl(g) < prev_dayl(g) .and. dayl(g) < PhenolParamsInst%crit_dayl) then
+                       offset_flag(p) = 1._r8
+                    endif
+                  endif
                end if
 
                ! force offset if daylength is < 6 hrs
