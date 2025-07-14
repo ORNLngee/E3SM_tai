@@ -7,7 +7,7 @@ module SoilHydrologyMod
   use shr_kind_mod      , only : r8 => shr_kind_r8
   use shr_log_mod       , only : errMsg => shr_log_errMsg
   use decompMod         , only : bounds_type
-  use elm_varctl        , only : iulog, use_vichydro
+  use elm_varctl        , only : iulog, use_vichydro, japglog
   use elm_varcon        , only : e_ice, denh2o, denice, rpi
   use EnergyFluxType    , only : energyflux_type
   use SoilHydrologyType , only : soilhydrology_type
@@ -59,7 +59,7 @@ contains
 #endif
 #if (defined COL4TH)
     use pftvarcon       , only : humhol_ht_frac          ! ====================================================================>  japg [06-04-2025]
-    use pftvarcon       , only : humhol_ht_frac2         ! ====================================================================>  japg [06-04-2025]
+    use pftvarcon       , only : humhol_ht_2frac         ! ====================================================================>  japg [06-04-2025]
 #endif
     use SoilWaterMovementMod, only : zengdecker_2009_with_var_soil_thick
     !
@@ -132,7 +132,7 @@ contains
          )
 
       ! Get time step
-
+      write(japglog,*) 'SurfaceRunoff'
       do fc = 1, num_hydrologyc
          c = filter_hydrologyc(fc)
          nlevbed = nlev2bed(c)
@@ -197,9 +197,13 @@ contains
 
 #if (defined COL4TH)
          if (c .eq. 1) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_frac*(zwt(c)))   !at 30cm, hummock saturated at 5% changed to 0.1 TAO
-         if (c .eq. 2) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_frac2*(zwt(c)))  ! ==========> japg [06-04-2025] 
+         if (c .eq. 2) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_2frac*(zwt(c)))  ! ==========> japg [06-04-2025] 
          if (c .eq. 3) fsat(c) = 1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)))   !at 30cm, hummock saturated at 5% changed to 0.1 TAO
          if (c .eq. 4) fsat(c) = min(1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)-h2osfc(c)/1000.+humhol_ht)), 1._r8) !TAO 0.3 t0 0.1, 0.15 to 0.35 !bsulman: what does 0.15 represent?
+
+         write(japglog,*) 'SurfaceRunoff: fsat(c) = ', fsat(c), ' column ', c, 'humhol_ht = ', humhol_ht,' humhol_ht_frac = ', humhol_ht_frac, ' humhol_ht_2frac = ', humhol_ht_2frac ! japg [07-09-2025]
+
+
 #endif
 
          ! use perched water table to determine fsat (if present)
@@ -226,7 +230,7 @@ contains
 
 #if (defined COL4TH)
             if (c .eq. 1) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_frac*(zwt(c)))   !at 30cm, hummock saturated at 5%
-            if (c .eq. 2) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_frac2*(zwt(c)))  ! ==========> japg [06-04-2025]
+            if (c .eq. 2) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_2frac*(zwt(c)))  ! ==========> japg [06-04-2025]
             if (c .eq. 3) fsat(c) = 1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)))
             if (c .eq. 4) fsat(c) = min(1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)-h2osfc(c)/1000.+humhol_ht)), 1._r8) !TAO 0.3 t 0.1, 0.15 to 0.35
 #endif
@@ -252,7 +256,7 @@ contains
 
 #if (defined COL4TH)
             if (c .eq. 1) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_frac*(zwt(c)))     !at 30cm, hummock saturated at 5%
-            if (c .eq. 2) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_frac2*(zwt(c)))    ! ==========> japg [06-04-2025]
+            if (c .eq. 2) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_2frac*(zwt(c)))    ! ==========> japg [06-04-2025]
             if (c .eq. 3) fsat(c) = 1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)))
             if (c .eq. 4) fsat(c) = min(1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)-h2osfc(c)/1000.+humhol_ht)), 1._r8) !TAO 0.3 t 1.5, 0.15 to 0.35
 #endif
@@ -378,7 +382,7 @@ contains
 #endif
 
 #if (defined COL4TH)
-     use pftvarcon        , only : humhol_ht_frac, humhol_ht_frac2
+     use pftvarcon        , only : humhol_ht_frac, humhol_ht_2frac
 #endif
 
 #if (defined MARSH || defined COL3RD || defined COL4TH)
@@ -518,6 +522,7 @@ contains
               )
 
 
+       write(japglog,*) 'Infiltration'       
        ! Infiltration into surface soil layer (minus the evaporation)
        do fc = 1, num_hydrologyc
           c = filter_hydrologyc(fc)
@@ -1031,6 +1036,7 @@ contains
 
 #if (defined COL4TH)
              write(iulog,*), 'japg1 [04-28-2025] ===============> SoilHydrologyMod.F90/Infiltration,  num_hydrologyc = ', num_hydrologyc ! ==========> japg [04-23-2025]
+             
              if(num_hydrologyc .ne. 4) call endrun(msg="Error: Must have 4 columns if COL4TH is defined")
              !compute lateral flux in aquifer
              if (jwt(c) .lt. nlevbed) then
@@ -1181,10 +1187,10 @@ contains
                      qflx_lat_aqu(4) = qflx_lat_aqu(4) - min((h2osfc(4) - (h2osfc(3) + humhol_ht*1000.0)) * sfcflow_ratescale, h2osfc(4)*0.5/dtime)
                      qflx_lat_aqu(3) = qflx_lat_aqu(3) + min((h2osfc(4) - (h2osfc(3) + humhol_ht*1000.0)) * sfcflow_ratescale, h2osfc(4)*0.5/dtime)
 
-                     if (h2osfc(3) > 0.0 .and. (h2osfc(2) + humhol_ht*humhol_ht_frac2*1000.0) < h2osfc(3) + humhol_ht*1000.0) then
+                     if (h2osfc(3) > 0.0 .and. (h2osfc(2) + humhol_ht*humhol_ht_2frac*1000.0) < h2osfc(3) + humhol_ht*1000.0) then
                         ! Flow from 3 -> 2
-                        qflx_lat_aqu(3) = qflx_lat_aqu(3) - min((h2osfc(3) + humhol_ht*1000.0 - (h2osfc(2) + humhol_ht*humhol_ht_frac2*1000.0)) * sfcflow_ratescale, h2osfc(3)*0.5/dtime)
-                        qflx_lat_aqu(2) = qflx_lat_aqu(2) + min((h2osfc(3) + humhol_ht*1000.0 - (h2osfc(2) + humhol_ht*humhol_ht_frac2*1000.0)) * sfcflow_ratescale, h2osfc(3)*0.5/dtime)
+                        qflx_lat_aqu(3) = qflx_lat_aqu(3) - min((h2osfc(3) + humhol_ht*1000.0 - (h2osfc(2) + humhol_ht*humhol_ht_2frac*1000.0)) * sfcflow_ratescale, h2osfc(3)*0.5/dtime)
+                        qflx_lat_aqu(2) = qflx_lat_aqu(2) + min((h2osfc(3) + humhol_ht*1000.0 - (h2osfc(2) + humhol_ht*humhol_ht_2frac*1000.0)) * sfcflow_ratescale, h2osfc(3)*0.5/dtime)
 
                         if (h2osfc(2) > 0.0 .and. (h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0) < h2osfc(2) + humhol_ht*1000.0) then
                            ! Flow from 2 -> 1
@@ -1196,10 +1202,10 @@ contains
                            qflx_lat_aqu(1) = qflx_lat_aqu(1) - min(((h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0) - h2osfc(2) - humhol_ht*1000.0) * sfcflow_ratescale, h2osfc(1)*0.5/dtime)
                         endif
 
-                     elseif (h2osfc(2) > 0.0 .and. (h2osfc(2) + humhol_ht*humhol_ht_frac2*1000.0) > h2osfc(3) + humhol_ht*1000.0) then
+                     elseif (h2osfc(2) > 0.0 .and. (h2osfc(2) + humhol_ht*humhol_ht_2frac*1000.0) > h2osfc(3) + humhol_ht*1000.0) then
                         ! Flow from 2 -> 3
-                        qflx_lat_aqu(3) = qflx_lat_aqu(3) + min(((h2osfc(2) + humhol_ht*humhol_ht_frac2*1000.0) - h2osfc(3) - humhol_ht*1000.0) * sfcflow_ratescale, h2osfc(2)*0.5/dtime)
-                        qflx_lat_aqu(2) = qflx_lat_aqu(2) - min(((h2osfc(2) + humhol_ht*humhol_ht_frac2*1000.0) - h2osfc(3) - humhol_ht*1000.0) * sfcflow_ratescale, h2osfc(2)*0.5/dtime)
+                        qflx_lat_aqu(3) = qflx_lat_aqu(3) + min(((h2osfc(2) + humhol_ht*humhol_ht_2frac*1000.0) - h2osfc(3) - humhol_ht*1000.0) * sfcflow_ratescale, h2osfc(2)*0.5/dtime)
+                        qflx_lat_aqu(2) = qflx_lat_aqu(2) - min(((h2osfc(2) + humhol_ht*humhol_ht_2frac*1000.0) - h2osfc(3) - humhol_ht*1000.0) * sfcflow_ratescale, h2osfc(2)*0.5/dtime)
 
                         if (h2osfc(1) > 0.0 .and. (h2osfc(1) + humhol_ht*humhol_ht_frac*1000.0) > h2osfc(2) + humhol_ht*1000.0) then
                            ! Flow from 1 -> 2
@@ -1423,7 +1429,7 @@ contains
 
 
        ! Convert layer thicknesses from m to mm
-
+       write(japglog,*) 'WaterTable'  
        do fc = 1, num_hydrologyc
           c = filter_hydrologyc(fc)
           nlevbed = nlev2bed(c)
@@ -1898,7 +1904,7 @@ contains
 
 
        ! Convert layer thicknesses from m to mm
-
+         write(japglog,*) 'Drainage' 
         do fc = 1, num_hydrologyc
           c = filter_hydrologyc(fc)
           nlevbed = nlev2bed(c)
@@ -2606,7 +2612,7 @@ contains
           )
 
        ! Convert layer thicknesses from m to mm
-
+         write(japglog,*) 'DrainageVSFM'
        do j = 1,nlevgrnd
           do fc = 1, num_hydrologyc
              c = filter_hydrologyc(fc)
@@ -2943,6 +2949,7 @@ contains
           )
 
        ! map CLM to VIC
+          write(japglog,*) 'ELMVICMap'
        do fc = 1, numf
           c = filter(fc)
           do i = 1, nlayer

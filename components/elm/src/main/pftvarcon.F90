@@ -317,7 +317,7 @@ module pftvarcon
   real(r8)              :: qflx_h2osfc_surfrate
   real(r8)              :: humhol_ht
   real(r8)              :: humhol_ht_frac   ![Wei Huang 2022-08-17]fraction for 2nd plant
-  real(r8)              :: humhol_ht_frac2  ! japg [06-04-2025] fraction for 3rd plant 
+  real(r8)              :: humhol_ht_2frac  ! japg [06-04-2025] fraction for 3rd plant 
   real(r8)              :: hum_frac
   real(r8)              :: humhol_dist
 ! Tidal cycle controls
@@ -1081,8 +1081,8 @@ contains
     if ( .not. readv) humhol_ht = 0.15_r8
     call ncd_io('humhol_ht_frac', humhol_ht_frac, 'read', ncid, readvar=readv, posNOTonfile=.true.)
     if ( .not. readv) humhol_ht_frac = 1.4_r8
-    call ncd_io('humhol_ht_frac', humhol_ht_frac2, 'read', ncid, readvar=readv, posNOTonfile=.true.)    ! japg [06-04-2025] 
-    if ( .not. readv) humhol_ht_frac2 = 1.2_r8                                                          ! japg [06-04-2025] 
+    call ncd_io('humhol_ht_2frac', humhol_ht_2frac, 'read', ncid, readvar=readv, posNOTonfile=.true.)    ! japg [06-04-2025] 
+    if ( .not. readv) humhol_ht_2frac = 1.2_r8                                                          ! japg [06-04-2025] 
     call ncd_io('humhol_dist', humhol_dist, 'read', ncid, readvar=readv, posNOTonfile=.true.)
     if ( .not. readv) humhol_dist = 1.0_r8
     call ncd_io('hum_frac', hum_frac, 'read', ncid, readvar=readv, posNOTonfile=.true.)
