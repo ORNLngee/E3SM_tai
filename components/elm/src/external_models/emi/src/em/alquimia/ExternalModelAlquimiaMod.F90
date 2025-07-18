@@ -1376,7 +1376,8 @@ end subroutine EMAlquimia_Coldstart
                   qflx_lat_aqu_l2e(c,j) = qflx_lat_aqu_l2e(c,j) - (qflx_adv_l2e(c,j-1)-qflx_adv_l2e(c,j))
               enddo
 
-
+              ! for testing
+              qflx_lat_aqu_l2e(c,:) = qflx_lat_aqu_l2e(c,:)*0.01
 
               ! Problem: in elm_driver, vertical water movement and lateral (tidal) flow are calculated, then BGC, then drainage. 
               ! So including drainage here is inconsistent order of operations (actually applying drainage from previous time step)
