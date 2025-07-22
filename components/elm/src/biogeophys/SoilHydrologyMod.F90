@@ -374,6 +374,7 @@ contains
      use column_varcon    , only : icol_roof, icol_road_imperv, icol_sunwall, icol_shadewall, icol_road_perv
      use landunit_varcon  , only : istsoil, istcrop
      use abortutils       , only : endrun
+     
 #if (defined HUM_HOL || defined MARSH || defined COL3RD || defined COL4TH)
      use pftvarcon        , only : humhol_ht, humhol_dist, hum_frac, qflx_h2osfc_surfrate
 #endif
@@ -389,6 +390,7 @@ contains
       use pftvarcon       , only : num_tide_comps, tide_baseline,tide_coeff_period, tide_coeff_phase, tide_coeff_amp,sfcflow_ratescale
       use elm_instMod     , only : atm2lnd_vars
       use elm_varctl      , only : tide_file
+      use domainMod       , only : ldomain
 #endif
      use clm_time_manager , only : get_step_size, get_curr_date, get_curr_time
      use elm_varcon       , only : secspday
@@ -431,6 +433,11 @@ contains
      real(r8) :: d
      real(r8) :: h2osoi_vol
      real(r8) :: basis                                      ! temporary, variable soil moisture holding capacity
+     real(r8) :: lat_ref, lon_ref                           ! japg [07-16-2025]
+     real(r8) :: a_tide, c_tide
+     real(r8), parameter :: R_tide = 6371000.0_r8           ! japg [07-16-2025] Earth radius in meters     
+     real(r8) :: dlat_tide
+     real(r8) :: dlon_tide
      ! in top VIC layers for runoff calculation
      real(r8) :: rsurf_vic                                  ! temp VIC surface runoff
      real(r8) :: top_moist(bounds%begc:bounds%endc)         ! temporary, soil moisture in top VIC layers
@@ -439,7 +446,7 @@ contains
      real(r8) :: top_icefrac                                ! temporary, ice fraction in top VIC layers
      ! variables for HUM_HOL and MARSH
      real(r8) :: dzmm(bounds%begc:bounds%endc,1:nlevsoi)   ! layer thickness (mm)
-     real(r8) :: hol_frac                        ! fraction of gridcell occupied by hummocks and hollows respectively
+     real(r8) :: hol_frac                                  ! fraction of gridcell occupied by hummocks and hollows respectively
      real(r8) :: ka_ho                                     ! hydraulic conductivity terms at saturation for hummock (mmH2O/s)
      real(r8) :: ka_hu                                     ! hydraulic conductivity terms at saturation for hollow(mmH2O/s)
      real(r8) :: zwt_ho, zwt_hu                            ! water table depth for hollows and hummocks respectively (m)
@@ -462,12 +469,18 @@ contains
      real(r8) :: h2osfc_tide
      real(r8) :: h2osfc_before
      real(r8) :: salt_content(bounds%begc:bounds%endc, 1:nlevgrnd)     !salt mass in marsh column
+     real(r8) :: lat_rad(1:num_hydrologyc) ! japg [07-17-2025]
+     real(r8) :: lon_rad(1:num_hydrologyc) ! japg [07-17-2025]
+     real(r8) :: dist_lat(1:num_hydrologyc-1) ! japg [07-17-2025]
+     real(r8) :: dist_lon(1:num_hydrologyc-1)  ! japg [07-17-2025]
+     real(r8) :: dist_col(1:num_hydrologyc-1) ! japg [07-17-2025]
+     
      !-----------------------------------------------------------------------
 
      associate(                                                                &
           snl                  =>    col_pp%snl                                 , & ! Input:  [integer  (:)   ]  minus number of snow layers
           dz                   =>    col_pp%dz                                  , & ! Input:  [real(r8) (:,:) ]  layer depth (m)
-         nlev2bed         =>    col_pp%nlevbed                                  , & ! Input:  [integer  (:)   ]  number of layers to bedrock
+          nlev2bed              =>    col_pp%nlevbed                                  , & ! Input:  [integer  (:)   ]  number of layers to bedrock
 
           t_soisno             =>    col_es%t_soisno           , & ! Input:  [real(r8) (:,:) ]  soil temperature (Kelvin)
 
@@ -518,11 +531,43 @@ contains
           h2osfcflag           =>    soilhydrology_vars%h2osfcflag           , & ! Input:  logical
           icefrac              =>    soilhydrology_vars%icefrac_col          , & ! Output: [real(r8) (:,:) ]  fraction of ice
           h2osoi_vol           =>    col_ws%h2osoi_vol                       , & ! Input: [real(r8) (:,:) ]  volumetric soil water (0<=h2osoi_vol<=watsat) [m3/m3]
-          zi                   =>    col_pp%zi                                 & ! Input: [real(r8) (:,:) ]  interface level below a "z" level (m)
-              )
+          zi                   =>    col_pp%zi                               , & ! Input: [real(r8) (:,:) ]  interface level below a "z" level (m)
+          loncoor              =>    ldomain%lonc                            , & ! Input: [real(r8) (:)] longitude of column center (degrees)
+          latcoor              =>    ldomain%latc                             & ! Input: [real(r8) (:)] latitude of column center (degrees)
+          )
 
 
-       write(japglog,*) 'Infiltration'       
+       write(japglog,*) 'Infiltration'
+       write(japglog,*) 'loncoor = ', loncoor
+       write(japglog,*) 'latcoor = ', latcoor
+
+       ! japg [07-16-2025]: Horizontal distance from tidal channel (hollow) to the others hummock ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+
+               do fc = 1, num_hydrologyc                  
+                  if (loncoor(fc) > 180.0_r8) loncoor(fc) = loncoor(fc) - 360.0_r8
+               end do
+
+            ! Convert degrees to radians            
+               lat_rad = latcoor * (acos(-1.0_r8) / 180.0_r8)
+               lon_rad = loncoor * (acos(-1.0_r8) / 180.0_r8)         
+  
+            ! Compute differences between consecutive points
+               do fc = 1, num_hydrologyc-1
+                  dist_lat(fc) = lat_rad(fc+1) - lat_rad(fc)
+                  dist_lon(fc) = lon_rad(fc+1) - lon_rad(fc)
+               end do
+
+               do fc = 1, num_hydrologyc-1
+                  a_tide = sin(dist_lat(fc)/2.0_r8)**2 + cos(lat_rad(fc)) * cos(lat_rad(fc+1)) * sin(dist_lon(fc)/2.0_r8)**2
+                  c_tide = 2.0_r8 * atan2(sqrt(a_tide), sqrt(1.0_r8 - a_tide))
+                  dist_col(fc) = R_tide * c_tide
+               end do
+               
+               write(japglog,*) 'dist_col = ', dist_col
+
+       ! japg [07-16-2025]: Horizontal distance from tidal channel (hollow) to the others hummock  ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
+
+
        ! Infiltration into surface soil layer (minus the evaporation)
        do fc = 1, num_hydrologyc
           c = filter_hydrologyc(fc)
@@ -1430,6 +1475,9 @@ contains
 
        ! Convert layer thicknesses from m to mm
        write(japglog,*) 'WaterTable'  
+       
+
+
        do fc = 1, num_hydrologyc
           c = filter_hydrologyc(fc)
           nlevbed = nlev2bed(c)
