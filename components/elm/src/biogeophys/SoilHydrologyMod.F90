@@ -60,6 +60,7 @@ contains
 #if (defined COL4TH)
     use pftvarcon       , only : humhol_ht_frac          ! ====================================================================>  japg [06-04-2025]
     use pftvarcon       , only : humhol_ht_2frac         ! ====================================================================>  japg [06-04-2025]
+    use domainMod       , only : ldomain 
 #endif
     use SoilWaterMovementMod, only : zengdecker_2009_with_var_soil_thick
     !
@@ -74,7 +75,7 @@ contains
     real(r8), intent(in)  :: dtime
     !
     ! !LOCAL VARIABLES:
-    integer  :: c,j,fc,g,l,i                               !indices
+    integer  :: c,j,fc,g,l,i, ic                           !indices
     integer  :: nlevbed                                    !# levels to bedrock
     real(r8) :: xs(bounds%begc:bounds%endc)                !excess soil water above urban ponding limit
     real(r8) :: vol_ice(bounds%begc:bounds%endc,1:nlevgrnd) !partial volume of ice lens in layer
@@ -88,6 +89,14 @@ contains
     real(r8) :: top_moist(bounds%begc:bounds%endc)         !temporary, soil moisture in top VIC layers
     real(r8) :: top_max_moist(bounds%begc:bounds%endc)     !temporary, maximum soil moisture in top VIC layers
     real(r8) :: top_ice(bounds%begc:bounds%endc)           !temporary, ice len in top VIC layers
+    real(r8) :: lat_ref, lon_ref                           ! japg [08-13-2025]
+    real(r8) :: a_tide, c_tide
+    real(r8), parameter :: R_tide = 6371000.0_r8           ! japg [08-13-2025] Earth radius in meters     
+    real(r8) :: lat_rad(1:num_hydrologyc)                  ! japg [08-13-2025]
+    real(r8) :: lon_rad(1:num_hydrologyc)                  ! japg [08-13-2025]
+    real(r8) :: dist_lat(1:num_hydrologyc-1)               ! japg [08-13-2025]
+    real(r8) :: dist_lon(1:num_hydrologyc-1)               ! japg [08-13-2025]
+    real(r8) :: dist_col(1:num_hydrologyc-1)               ! japg [08-13-2025]
     character(len=32) :: subname = 'SurfaceRunoff'         !subroutine name
     !-----------------------------------------------------------------------
 
@@ -128,11 +137,14 @@ contains
          icefrac          =>    soilhydrology_vars%icefrac_col      , & ! Output: [real(r8) (:,:) ]
          ice              =>    soilhydrology_vars%ice_col          , & ! Output: [real(r8) (:,:) ]  ice len in each VIC layers(ice, mm)
          max_infil        =>    soilhydrology_vars%max_infil_col    , & ! Output: [real(r8) (:)   ]  maximum infiltration capacity in VIC (mm)
-         i_0              =>    soilhydrology_vars%i_0_col            & ! Output: [real(r8) (:)   ]  column average soil moisture in top VIC layers (mm)
+         i_0              =>    soilhydrology_vars%i_0_col          , & ! Output: [real(r8) (:)   ]  column average soil moisture in top VIC layers (mm)
+         loncoor          =>    ldomain%lonc                        , & ! Input: [real(r8) (:)] longitude of column center (degrees)
+         latcoor          =>    ldomain%latc                          & ! Input: [real(r8) (:)] latitude of column center (degrees)
          )
 
       ! Get time step
       write(japglog,*) 'SurfaceRunoff'
+
       do fc = 1, num_hydrologyc
          c = filter_hydrologyc(fc)
          nlevbed = nlev2bed(c)
@@ -201,7 +213,36 @@ contains
          if (c .eq. 3) fsat(c) = 1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)))   !at 30cm, hummock saturated at 5% changed to 0.1 TAO
          if (c .eq. 4) fsat(c) = min(1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)-h2osfc(c)/1000.+humhol_ht)), 1._r8) !TAO 0.3 t0 0.1, 0.15 to 0.35 !bsulman: what does 0.15 represent?
 
-         write(japglog,*) 'SurfaceRunoff: fsat(c) = ', fsat(c), ' column ', c, 'humhol_ht = ', humhol_ht,' humhol_ht_frac = ', humhol_ht_frac, ' humhol_ht_2frac = ', humhol_ht_2frac ! japg [07-09-2025]
+         ! japg [08-13-2025]: Probabilty of saturation ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+         
+         do ic = 1, num_hydrologyc                  
+                  if (loncoor(ic) > 180.0_r8) loncoor(ic) = loncoor(ic) - 360.0_r8
+         end do
+
+         ! Convert degrees to radians            
+         lat_rad = latcoor * (acos(-1.0_r8) / 180.0_r8)
+         lon_rad = loncoor * (acos(-1.0_r8) / 180.0_r8)         
+
+         ! Compute differences between consecutive points
+         do ic = 1, num_hydrologyc-1
+            dist_lat(ic) = lat_rad(ic+1) - lat_rad(ic)
+            dist_lon(ic) = lon_rad(ic+1) - lon_rad(ic)
+         end do
+
+         do ic = 1, num_hydrologyc-1
+            a_tide = sin(dist_lat(ic)/2.0_r8)**2 + cos(lat_rad(ic)) * cos(lat_rad(ic+1)) * sin(dist_lon(ic)/2.0_r8)**2
+            c_tide = 2.0_r8 * atan2(sqrt(a_tide), sqrt(1.0_r8 - a_tide))
+            dist_col(ic) = R_tide * c_tide
+         end do
+         
+         
+
+         
+         write(japglog,*) 'SurfaceRunoof/dist_col = ', dist_col  
+
+         ! japg [08-13-2025]: Probabilty of saturation ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
+
+         !write(japglog,*) 'SurfaceRunoff: fsat(c) = ', fsat(c), ' column ', c, 'humhol_ht = ', humhol_ht,' humhol_ht_frac = ', humhol_ht_frac, ' humhol_ht_2frac = ', humhol_ht_2frac ! japg [07-09-2025]
 
 
 #endif
@@ -407,7 +448,7 @@ contains
      real(r8), intent(in)  :: dtime
      !
      ! !LOCAL VARIABLES:
-     integer  :: c,j,l,fc                                   ! indices
+     integer  :: c,j,l,fc, ic                               ! indices
      integer  :: nlevbed                                    !# levels to bedrock
      real(r8) :: s1,su,v                                    ! variable to calculate qinmax
      real(r8) :: qinmax                                     ! maximum infiltration capacity (mm/s)
@@ -469,12 +510,15 @@ contains
      real(r8) :: h2osfc_tide
      real(r8) :: h2osfc_before
      real(r8) :: salt_content(bounds%begc:bounds%endc, 1:nlevgrnd)     !salt mass in marsh column
-     real(r8) :: lat_rad(1:num_hydrologyc) ! japg [07-17-2025]
-     real(r8) :: lon_rad(1:num_hydrologyc) ! japg [07-17-2025]
-     real(r8) :: dist_lat(1:num_hydrologyc-1) ! japg [07-17-2025]
-     real(r8) :: dist_lon(1:num_hydrologyc-1)  ! japg [07-17-2025]
-     real(r8) :: dist_col(1:num_hydrologyc-1) ! japg [07-17-2025]
-     
+     real(r8) :: lat_rad(1:num_hydrologyc)         ! japg [07-17-2025]
+     real(r8) :: lon_rad(1:num_hydrologyc)         ! japg [07-17-2025]
+     real(r8) :: dist_lat(1:num_hydrologyc-1)      ! japg [07-17-2025]
+     real(r8) :: dist_lon(1:num_hydrologyc-1)      ! japg [07-17-2025]
+     real(r8) :: dist_col(1:num_hydrologyc-1)      ! japg [07-17-2025]
+     real(r8) :: humhol_elevs(1:num_hydrologyc-1)  ! japg [07-23-2025] humhol elevvations for each column
+     real(r8) :: hydhead_diff(1:num_hydrologyc-1)  ! japg [07-23-2025] hydrualic head difference between columns
+     real(r8) :: hyka(1:num_hydrologyc)            ! japg [07-23-2025] Hydraulic conductivity for each column
+     real(r8) :: seg_qflx_lat_aqu(1:num_hydrologyc-1)  ! japg [07-23-2025] segement lateral fluxes
      !-----------------------------------------------------------------------
 
      associate(                                                                &
@@ -536,37 +580,35 @@ contains
           latcoor              =>    ldomain%latc                             & ! Input: [real(r8) (:)] latitude of column center (degrees)
           )
 
+         ! japg [07-22-2025]: Horizontal distance between columns ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+         
+               !write(japglog,*) 'Infiltration'
+               !write(japglog,*) 'loncoor = ', loncoor
+               !write(japglog,*) 'latcoor = ', latcoor                  
 
-       write(japglog,*) 'Infiltration'
-       write(japglog,*) 'loncoor = ', loncoor
-       write(japglog,*) 'latcoor = ', latcoor
-
-       ! japg [07-16-2025]: Horizontal distance from tidal channel (hollow) to the others hummock ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
-
-               do fc = 1, num_hydrologyc                  
-                  if (loncoor(fc) > 180.0_r8) loncoor(fc) = loncoor(fc) - 360.0_r8
+               do ic = 1, num_hydrologyc                  
+                  if (loncoor(ic) > 180.0_r8) loncoor(ic) = loncoor(ic) - 360.0_r8
                end do
 
-            ! Convert degrees to radians            
+               ! Convert degrees to radians            
                lat_rad = latcoor * (acos(-1.0_r8) / 180.0_r8)
                lon_rad = loncoor * (acos(-1.0_r8) / 180.0_r8)         
   
-            ! Compute differences between consecutive points
-               do fc = 1, num_hydrologyc-1
-                  dist_lat(fc) = lat_rad(fc+1) - lat_rad(fc)
-                  dist_lon(fc) = lon_rad(fc+1) - lon_rad(fc)
+               ! Compute differences between consecutive points
+               do ic = 1, num_hydrologyc-1
+                  dist_lat(ic) = lat_rad(ic+1) - lat_rad(ic)
+                  dist_lon(ic) = lon_rad(ic+1) - lon_rad(ic)
                end do
 
-               do fc = 1, num_hydrologyc-1
-                  a_tide = sin(dist_lat(fc)/2.0_r8)**2 + cos(lat_rad(fc)) * cos(lat_rad(fc+1)) * sin(dist_lon(fc)/2.0_r8)**2
+               do ic = 1, num_hydrologyc-1
+                  a_tide = sin(dist_lat(ic)/2.0_r8)**2 + cos(lat_rad(ic)) * cos(lat_rad(ic+1)) * sin(dist_lon(ic)/2.0_r8)**2
                   c_tide = 2.0_r8 * atan2(sqrt(a_tide), sqrt(1.0_r8 - a_tide))
-                  dist_col(fc) = R_tide * c_tide
+                  dist_col(ic) = R_tide * c_tide
                end do
-               
-               write(japglog,*) 'dist_col = ', dist_col
+                  
+               ! write(japglog,*) 'dist_col = ', dist_col
 
-       ! japg [07-16-2025]: Horizontal distance from tidal channel (hollow) to the others hummock  ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
-
+         ! japg [07-22-2025]: Distance between columns ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
 
        ! Infiltration into surface soil layer (minus the evaporation)
        do fc = 1, num_hydrologyc
@@ -1144,14 +1186,68 @@ contains
                  !water table
                  qflx_lat_aqu(:) = 0._r8
                else
-                 qflx_lat_aqu(1) =  2._r8/(1._r8/ka_hu1+1._r8/ka_ho) * (zwt_hu1-zwt_ho- &
-                     humhol_ht*humhol_ht_frac) / humhol_dist * sqrt(hol_frac/hum_frac)
-                 qflx_lat_aqu(2) =  2._r8/(1._r8/ka_hu2+1._r8/ka_ho) * (zwt_hu2-zwt_ho- &
-                     humhol_ht) / humhol_dist * sqrt(hol_frac/hum_frac)
-                 qflx_lat_aqu(3) =  2._r8/(1._r8/ka_hu3+1._r8/ka_ho) * (zwt_hu2-zwt_ho- &
-                     humhol_ht) / humhol_dist * sqrt(hol_frac/hum_frac)
-                 qflx_lat_aqu(4) = -2._r8/(1._r8/ka_hu3+1._r8/ka_ho) * (zwt_hu2-zwt_ho- &
-                     humhol_ht) / humhol_dist * sqrt(hum_frac/hol_frac)
+                  ! japg [07-22-2025]: lateral flux ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+                  
+                  ! 1. Compute hydraulic head difference between columns 
+                  
+                  humhol_elevs = [humhol_ht*humhol_ht_2frac, humhol_ht*humhol_ht_frac, humhol_ht] ! japg [07-23-2025] vector of humhol heights (elevations)
+                  
+                 !write(japglog,*) 'zwt = ', zwt
+                 !write(japglog,*) 'h2osfc = ', h2osfc
+                 !write(japglog,*) 'humhol_elevs(1) = ', humhol_elevs(1), 'humhol_elevs(2) = ', humhol_elevs(2), 'humhol_elevs(3) = ', humhol_elevs(3)
+
+                 ! hydhead_diff(1) = (humhol_elevs(2) - zwt(2) + h2osfc(2)/1000._r8) - ((humhol_elevs(1) - zwt(1) + h2osfc(1)/1000._r8))
+                 ! hydhead_diff(2) = (humhol_elevs(3) - zwt(3) + h2osfc(3)/1000._r8) - ((humhol_elevs(2) - zwt(2) + h2osfc(2)/1000._r8))
+                 ! hydhead_diff(3) = (                - zwt(4) + h2osfc(4)/1000._r8) - ((humhol_elevs(3) - zwt(3) + h2osfc(3)/1000._r8)) 
+
+                  do ic = 1, num_hydrologyc-1
+                     if (ic < num_hydrologyc-1) then  
+                        hydhead_diff(ic) = (humhol_elevs(ic+1) - zwt(ic+1) + h2osfc(ic+1)/1000._r8) - ((humhol_elevs(ic) - zwt(ic) + h2osfc(ic)/1000._r8))
+                     else                      
+                        hydhead_diff(ic) = (0.0_r8 - zwt(ic+1) + h2osfc(ic+1)/1000._r8) - ((humhol_elevs(ic) - zwt(ic) + h2osfc(ic)/1000._r8))
+                     end if 
+                  end do
+
+
+                  !write(japglog,*) 'humhol_elevs = ', humhol_elevs
+                  !write(japglog,*) 'hydhead_diff = ', hydhead_diff
+
+                  ! 2. Compute segment lateral fluxes based on hydraulic head differences and horizontal distance
+
+                  hyka = [ka_hu3, ka_hu2, ka_hu1, ka_ho] ! japg [07-23-2025] vector of hydraulic conductivities
+
+                  do ic = 1, num_hydrologyc-1                     
+                        seg_qflx_lat_aqu(ic) = -((hyka(ic)+hyka(ic+1))/2) * (hydhead_diff(ic) / dist_col(ic)) 
+                  end do
+
+                  ! 3. Compute net flow at each column
+
+                  !qflx_lat_aqu(1) = -seg_qflx_lat_aqu(1) * sqrt(hol_frac/hum_frac)                              ! japg [07-23-2025] first column (upland)
+                  !do ic = 2, num_hydrologyc-1
+                     !qflx_lat_aqu(ic) = seg_qflx_lat_aqu(ic-1) - seg_qflx_lat_aqu(ic) * sqrt(hol_frac/hum_frac) ! japg [07-23-2025] Interior columns (transitional)
+                  !end do
+                  !qflx_lat_aqu(num_hydrologyc) = seg_qflx_lat_aqu(num_hydrologyc-1)  * sqrt(hum_frac/hol_frac)   ! japg [07-23-2025] last column (tidal marsh)
+
+
+                  write(japglog,*) 'zwt = ', zwt(1:num_hydrologyc)
+                  write(japglog,*) 'h2osfc = ', h2osfc(1:num_hydrologyc)
+                  write(japglog,*) 'humhol_elevs = ', humhol_elevs
+                  write(japglog,*) 'seg_qflx_lat_aqu = ', seg_qflx_lat_aqu
+                  write(japglog,*) 'hol_frac = ', hol_frac, 'hum_frac = ', hum_frac, 'sqrt(hol_frac/hum_frac) =', sqrt(hol_frac/hum_frac)
+                  !write(japglog,*) 'qflx_lat_aqu = ', qflx_lat_aqu(1:num_hydrologyc)             
+
+                 
+                 ! japg [07-22-2025]: lateral flux ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
+                 
+                 
+                 qflx_lat_aqu(1) =  2._r8/(1._r8/ka_hu1+1._r8/ka_ho) * (zwt_hu1-zwt_ho-humhol_ht*humhol_ht_frac) / humhol_dist * sqrt(hol_frac/hum_frac)
+                 qflx_lat_aqu(2) =  2._r8/(1._r8/ka_hu2+1._r8/ka_ho) * (zwt_hu2-zwt_ho-humhol_ht) / humhol_dist * sqrt(hol_frac/hum_frac)
+                 qflx_lat_aqu(3) =  2._r8/(1._r8/ka_hu3+1._r8/ka_ho) * (zwt_hu2-zwt_ho-humhol_ht) / humhol_dist * sqrt(hol_frac/hum_frac)
+                 qflx_lat_aqu(4) = -2._r8/(1._r8/ka_hu3+1._r8/ka_ho) * (zwt_hu2-zwt_ho-humhol_ht) / humhol_dist * sqrt(hum_frac/hol_frac)
+                  
+                 write(japglog,*) 'qflx_lat_aqu = ', qflx_lat_aqu(1:num_hydrologyc)   
+
+
                  !salinity(1) = 25._r8 + 20_r8*qflx_lat_aqu(2)*dtime
                  !salinity(1) = 0._r8
                  !salinity(2) = 30._r8

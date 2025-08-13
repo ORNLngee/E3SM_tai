@@ -103,7 +103,7 @@ contains
     integer nb,ne
 
 !------------------------------------------------------------------------------
-    write(japglog,*) 'japg =======> domain_init '
+    !write(japglog,*) 'japg =======> domain_init '
     nb = 1
     ne = ni*nj
     if (present(nbeg)) then
@@ -202,7 +202,7 @@ end subroutine domain_init
     integer ier
 !
 !------------------------------------------------------------------------------
-    write(japglog,*) 'japg =======> domain_clean '
+    !write(japglog,*) 'japg =======> domain_clean '
     if (domain%set) then
        if (masterproc) then
           write(iulog,*) 'domain_clean: cleaning ',domain%ni,domain%nj
@@ -274,9 +274,9 @@ end subroutine domain_clean
 !
 !EOP
 !------------------------------------------------------------------------------
-  write(japglog,*) 'japg =======> domain_check ' 
-  write(japglog,*) 'japg =======> domain%latc ', domain%latc 
-  write(japglog,*) 'japg =======> domain%lonc ', domain%lonc 
+  !write(japglog,*) 'japg =======> domain_check ' 
+  !write(japglog,*) 'japg =======> domain%latc ', domain%latc 
+  !write(japglog,*) 'japg =======> domain%lonc ', domain%lonc 
   
   if (masterproc) then
     write(iulog,*) '  domain_check set       = ',domain%set
