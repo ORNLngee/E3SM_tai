@@ -1305,7 +1305,7 @@ end subroutine EMAlquimia_Coldstart
                 if(this%sodium_pool_number>0) lat_bc(this%sodium_pool_number) = flood_salinity_l2e(c)/.0018066_r8*0.5769_r8/22.989_r8
                 if(this%sulfide_pool_number>0) lat_bc(this%sulfide_pool_number) = flood_salinity_l2e(c)/.0018066_r8*1e-9_r8/33.1_r8
                 ! Assuming ocean water pH is 8 at salinity of 30 and freshwater pH is 6 at salinity of zero
-                if(this%Hplus_pool_number>0) lat_bc(this%Hplus_pool_number) = 10**(-(6+flood_salinity_l2e(c)*2.0/30.0))
+                if(this%Hplus_pool_number>0) lat_bc(this%Hplus_pool_number) = 10**(-(4.5+flood_salinity_l2e(c)*2.0/30.0))
                 
                 if(this%NO3_pool_number>0) lat_bc(this%NO3_pool_number) = flood_nitrate_l2e(c)*1000
 
@@ -1318,7 +1318,7 @@ end subroutine EMAlquimia_Coldstart
                   endif
                   if(this%sodium_pool_number>0) surf_bc(this%sodium_pool_number) = flood_salinity_l2e(c)/.0018066_r8*0.5769_r8/22.989_r8
                   if(this%sulfide_pool_number>0) surf_bc(this%sulfide_pool_number) = flood_salinity_l2e(c)/.0018066_r8*1e-9_r8/33.1_r8
-                  if(this%Hplus_pool_number>0) surf_bc(this%Hplus_pool_number) = 10**(-(6+flood_salinity_l2e(c)*2.0/30.0))
+                  if(this%Hplus_pool_number>0) surf_bc(this%Hplus_pool_number) = 10**(-(4.5+flood_salinity_l2e(c)*2.0/30.0))
                   
                   if(this%NO3_pool_number>0) surf_bc(this%NO3_pool_number) = flood_nitrate_l2e(c)*1000
                 else
@@ -1328,7 +1328,7 @@ end subroutine EMAlquimia_Coldstart
                   endif
                   if(this%sodium_pool_number>0) surf_bc(this%sodium_pool_number) = 0.0_r8
                   if(this%sulfide_pool_number>0) surf_bc(this%sulfide_pool_number) = 0.0_r8
-                  if(this%Hplus_pool_number>0) surf_bc(this%Hplus_pool_number) = 10**(-(6+0.0_r8*2.0/30.0))
+                  if(this%Hplus_pool_number>0) surf_bc(this%Hplus_pool_number) = 10**(-(4.5+0.0_r8*2.0/30.0))
 
                 endif
 

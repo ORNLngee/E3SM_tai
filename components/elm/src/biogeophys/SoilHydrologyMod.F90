@@ -702,9 +702,10 @@ contains
                  zwt_ho = zwt_ho - h2osfc(2)/1000._r8   !DMR 4/29/13
                end if
                !DMR 12/4/2015
-               if (icefrac(1,min(jwt(1)+1,nlevbed)) .ge. 0.90_r8 .or. &
-                       icefrac(2,min(jwt(2)+1,nlevbed)) .ge. 0.90_r8) then
+               if (icefrac(1,min(jwt(1)+1,nlevbed)) .ge. 0.01_r8 .or. &
+                       icefrac(2,min(jwt(2)+1,nlevbed)) .ge. 0.01_r8) then
                  !turn off lateral transport if any ice is present at or below,
+		 !changed it back to 0.01 BAM 5/15/25
                  !changed from 0.01 to 0.90 TAO 6/4/2021
                  !water table
                  qflx_lat_aqu(:) = 0._r8
@@ -768,7 +769,7 @@ contains
                ka_hu = max(ka_hu, 1e-5_r8)
 
                !DMR 12/4/2015
-               if (icefrac(c,min(jwt(c)+1,nlevbed)) .ge. .90_r8) then
+               if (icefrac(c,min(jwt(c)+1,nlevbed)) .ge. .30_r8) then
                   !turn off lateral transport if any ice is present at or below,
                   qflx_lat_aqu(c) = 0._r8
                else
