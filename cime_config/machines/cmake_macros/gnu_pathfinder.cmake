@@ -12,3 +12,23 @@ string(APPEND SLIBS " -Wl,-rpath,${NETCDF_C_PATH}/lib -L${NETCDF_C_PATH}/lib -ln
 string(APPEND SLIBS " -Wl,-rpath,${NETCDF_FORTRAN_PATH}/lib -L${NETCDF_FORTRAN_PATH}/lib -lnetcdff")
 string(APPEND SLIBS " -Wl,-rpath,${BLASLAPACK_LIBDIR} -L${BLASLAPACK_LIBDIR} -lblas -llapack")
 string(APPEND CXX_LIBS " -lstdc++")
+# make sure both ALQUIMIA_PATH and PFLOTRAN_PATH are in user's ENVs
+# such as:
+# export ALQUIMIA_PATH=/projects/hpcl-cli185/proj-shared/ccsi-apps/alquimia-pflotran/v2021/alquimia
+# export PFLOTRAN_PATH=/projects/hpcl-cli185/proj-shared/ccsi-apps/alquimia-pflotran/v2021/pflotran
+set(ALQUIMIA_PATH $ENV{ALQUIMIA_PATH})
+set(PFLOTRAN_PATH $ENV{PFLOTRAN_PATH})
+set(PETSC_DIR $ENV{PETSC_DIR})
+if (ALQUIMIA_PATH AND PFLOTRAN_PATH AND PETSC_DIR)
+  if (COMP_NAME STREQUAL "elm")
+    string(APPEND CPPDEFS " -DUSE_ALQUIMIA_LIB")
+    string(APPEND CFLAGS " -I${ALQUIMIA_PATH}/include")
+    string(APPEND CXXFLAGS " -I${ALQUIMIA_PATH}/include")
+    string(APPEND FFLAGS " -I${ALQUIMIA_PATH}/include -I${PFLOTRAN_PATH}")
+  endif()
+  if (COMP_NAME STREQUAL "cpl")
+    string(APPEND SLIBS " -Wl,-rpath,${ALQUIMIA_PATH}/lib -L${ALQUIMIA_PATH}/lib -lalquimia")
+    string(APPEND SLIBS " -Wl,-rpath,${PFLOTRAN_PATH} -L${PFLOTRAN_PATH} -lpflotranchem")
+    string(APPEND SLIBS " -Wl,-rpath,${PETSC_DIR}/lib -L${PETSC_DIR}/lib -lpetsc")
+  endif()
+endif()
