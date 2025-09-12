@@ -697,10 +697,6 @@ contains
     allocate( sal_threshold (0:mxpft) )
     allocate( sal_opt (0:mxpft) )
     allocate( sal_tol (0:mxpft) )
-    ! Make sure they are initialized to some values
-    sal_threshold(:) = 50.0_r8
-    sal_opt      (:) = 0.0_r8
-    sal_tol      (:) = 50.0_r8
 
     allocate( waterlevel_threshold (0:mxpft) )
     allocate( waterlevel_opt (0:mxpft) )
