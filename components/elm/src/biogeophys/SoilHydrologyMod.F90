@@ -75,7 +75,7 @@ contains
     real(r8), intent(in)  :: dtime
     !
     ! !LOCAL VARIABLES:
-    integer  :: c,j,fc,g,l,i, ic, fi                           !indices
+    integer  :: c,j,fc,g,l,i, ic, fi, grp                           !indices
     integer  :: nlevbed                                    !# levels to bedrock
     real(r8) :: xs(bounds%begc:bounds%endc)                !excess soil water above urban ponding limit
     real(r8) :: vol_ice(bounds%begc:bounds%endc,1:nlevgrnd) !partial volume of ice lens in layer
@@ -96,6 +96,8 @@ contains
     real(r8) :: transition_elevetion   = 1.2_r8            ! japg [08-13-2025] Elevation at transition in meters
     real(r8) :: wetland_elevetion      = 0.75_r8           ! japg [08-13-2025] Elevation at wetland in meters
     real(r8) :: openwater_elevetion    = 0._r8             ! japg [08-13-2025] Elevation at open water in meters
+    real(r8) :: tol                    = 1.0e-8_r8              ! japg [08-13-2025] 
+    real(r8) :: sum_dist                                   ! japg [08-13-2025] 
 
     real(r8) :: fixed_lat(1:4)         = [37.219244_r8, 37.219377_r8, 37.218901_r8, 37.21806_r8]  ! japg [08-13-2025] Lat coordinates
     real(r8) :: fixed_lon(1:4)         = [-76.408673_r8, -76.409241_r8, -76.410094_r8, -76.41228_r8]  ! japg [08-13-2025] Lat coordinates
@@ -104,15 +106,21 @@ contains
     real(r8) :: dist_fixed_lat(1:4)                  ! japg [08-13-2025]
     real(r8) :: dist_fixed_lon(1:4)                  ! japg [08-13-2025]
     real(r8) :: dist_fixed_col(1:3)                  ! japg [08-13-2025]
-
+    real(r8) :: slopeid(1:3)                         ! japg [08-13-2025]
 
     real(r8) :: lat_rad(1:num_hydrologyc)                  ! japg [08-13-2025]
     real(r8) :: lon_rad(1:num_hydrologyc)                  ! japg [08-13-2025]
     real(r8) :: dist_lat(1:num_hydrologyc-1)               ! japg [08-13-2025]
     real(r8) :: dist_lon(1:num_hydrologyc-1)               ! japg [08-13-2025]
     real(r8) :: dist_col(1:num_hydrologyc-1)               ! japg [08-13-2025]
+    real(r8) :: cumu_elev(1:num_hydrologyc)              ! japg [08-13-2025] 
     real(r8) :: slope_fixed_coor(1:num_hydrologyc-1)       ! japg [08-13-2025]
     real(r8) :: fixed_col_elevetions(1:num_hydrologyc)     ! japg [08-13-2025]
+    real(r8) :: elevations_cols(1:num_hydrologyc)             ! japg [08-13-2025]
+    real(r8) :: fsat_japg(1:num_hydrologyc)             ! japg [08-13-2025]
+    
+
+
     character(len=32) :: subname = 'SurfaceRunoff'         !subroutine name
     !-----------------------------------------------------------------------
 
@@ -160,6 +168,94 @@ contains
 
       ! Get time step
       write(japglog,*) 'SurfaceRunoff'
+
+#if (defined COL4TH)
+         
+! japg [09-04-2025]: Probabilty of saturation ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+      
+         ! (1) Fixed coordenates are needed to estimate slopes. These coordenates come from field measurements *******************************************************************
+
+         ! Convert degrees to radian
+
+         fixed_lat_rad = fixed_lat * (acos(-1.0_r8) / 180.0_r8) ! japg [08-13-2025] convert fixed latitude to radian
+         fixed_lon_rad = fixed_lon * (acos(-1.0_r8) / 180.0_r8) ! japg [08-13-2025] convert fixed longitude to radian
+
+         do fi = 1, size(fixed_lat)
+            dist_fixed_lat(fi) = fixed_lat_rad(fi+1) - fixed_lat_rad(fi)
+            dist_fixed_lon(fi) = fixed_lon_rad(fi+1) - fixed_lon_rad(fi)
+         end do                  
+
+         fixed_col_elevetions = [upland_elevetion, transition_elevetion, wetland_elevetion, openwater_elevetion] ! japg [08-13-2025] elevetions for fixed coordinates
+         
+         do fi = 1, size(fixed_lat)-1
+            a_tide = sin(dist_fixed_lat(fi)/2.0_r8)**2 + cos(fixed_lat_rad(fi)) * cos(fixed_lat_rad(fi+1)) * sin(dist_fixed_lon(fi)/2.0_r8)**2            
+            c_tide = 2.0_r8 * atan2(sqrt(a_tide), sqrt(1.0_r8 - a_tide))
+
+            dist_fixed_col(fi) = R_tide * c_tide
+
+            slope_fixed_coor(fi) = (fixed_col_elevetions(fi)-fixed_col_elevetions(fi+1)) / dist_fixed_col(fi) ! japg [08-13-2025] slope from upland to wetland
+         end do                                 
+         
+
+         ! (2) Estimation of elevation using interpolated coordenates from OLMT and sloples from (1) *******************************************************************
+
+         
+         do ic = 1, num_hydrologyc                  
+                  if (loncoor(ic) > 180.0_r8) loncoor(ic) = loncoor(ic) - 360.0_r8
+         end do
+
+
+         lat_rad = latcoor * (acos(-1.0_r8) / 180.0_r8)
+         lon_rad = loncoor * (acos(-1.0_r8) / 180.0_r8)         
+
+         ! Compute differences between consecutive points
+         
+         do ic = 1, num_hydrologyc-1
+            dist_lat(ic) = lat_rad(ic+1) - lat_rad(ic)
+            dist_lon(ic) = lon_rad(ic+1) - lon_rad(ic)
+         end do         
+
+         do ic = 1, num_hydrologyc-1
+            a_tide = sin(dist_lat(ic)/2.0_r8)**2 + cos(lat_rad(ic)) * cos(lat_rad(ic+1)) * sin(dist_lon(ic)/2.0_r8)**2
+            c_tide = 2.0_r8 * atan2(sqrt(a_tide), sqrt(1.0_r8 - a_tide))
+            dist_col(ic) = R_tide * c_tide           
+         end do                     
+         
+         grp         = 1
+         sum_dist    = 0.0_r8
+         
+
+         ! japg [09-03-2025]: Determine the index based on the coordinate distances 
+         do ic = 1, num_hydrologyc-1
+            sum_dist = sum_dist + dist_col(ic)           
+
+            if (abs(sum_dist - dist_fixed_col(grp)) < tol) then
+               ! write(japglog,*) 'SurfaceRunoof/ sum_dist = ', sum_dist, ' grp = ', grp, ' ic = ', ic
+               slopeid(grp) = ic
+               grp = grp +1
+               sum_dist = 0.0_r8
+               ! write(japglog,*) 'SurfaceRunoof/ slopeid(grp) = ', slopeid(grp)
+            end if
+         end do
+         
+         ! write(japglog,*) 'SurfaceRunoof/after the loop slopeid = ', slopeid
+
+         do ic = num_hydrologyc, 1, -1
+            ! write(japglog,*) 'SurfaceRunoof/ before computing elevations ic = ', ic
+            if (ic<=slopeid(1)) then
+               elevations_cols(ic) = slope_fixed_coor(1) * dist_col(ic) + elevations_cols(ic+1)
+            else if (ic<=slopeid(2)) then
+               elevations_cols(ic) = slope_fixed_coor(2) * dist_col(ic) + elevations_cols(ic+1)
+            else if (ic<=slopeid(3)) then
+               elevations_cols(ic) = slope_fixed_coor(3) * dist_col(ic) + elevations_cols(ic+1)
+            else if (ic == num_hydrologyc) then
+               elevations_cols(ic) = openwater_elevetion
+            end if          
+         end do          
+#endif
+
+   ! japg [09-04-2025]: Probabilty of saturation ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
+
 
       do fc = 1, num_hydrologyc
          c = filter_hydrologyc(fc)
@@ -224,83 +320,56 @@ contains
 #endif
 
 #if (defined COL4TH)
-         if (c .eq. 1) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_frac*(zwt(c)))   !at 30cm, hummock saturated at 5% changed to 0.1 TAO
-         if (c .eq. 2) fsat(c) = 1.0 * exp(-3.0_r8/humhol_ht*humhol_ht_2frac*(zwt(c)))  ! ==========> japg [06-04-2025] 
+
+         write(japglog,*) 'SurfaceRunoof/ Index c = ', c
+         if (c .eq. 1) fsat(c) = 1.0 * exp(-3.0_r8/(humhol_ht*humhol_ht_frac)*(zwt(c)))   !at 30cm, hummock saturated at 5% changed to 0.1 TAO
+         if (c .eq. 2) fsat(c) = 1.0 * exp(-3.0_r8/(humhol_ht*humhol_ht_2frac)*(zwt(c)))  ! ==========> japg [06-04-2025] 
          if (c .eq. 3) fsat(c) = 1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)))   !at 30cm, hummock saturated at 5% changed to 0.1 TAO
          if (c .eq. 4) fsat(c) = min(1.0 * exp(-3.0_r8/(humhol_ht)*(zwt(c)-h2osfc(c)/1000.+humhol_ht)), 1._r8) !TAO 0.3 t0 0.1, 0.15 to 0.35 !bsulman: what does 0.15 represent?
-
-         ! japg [08-13-2025]: Probabilty of saturation ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
-      
-         ! For all the fixed coordinates vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-         write(japglog,*)'SurfaceRunoff: fixed_lon = ', fixed_lon 
-         write(japglog,*)'SurfaceRunoff: fixed_lat = ', fixed_lat  ! japg [08-13-2025]
-
-         ! Convert degrees to radian
-
-         fixed_lat_rad = fixed_lat * (acos(-1.0_r8) / 180.0_r8) ! japg [08-13-2025] convert fixed latitude to radian
-         fixed_lon_rad = fixed_lon * (acos(-1.0_r8) / 180.0_r8) ! japg [08-13-2025] convert fixed longitude to radian
-
-         write(japglog,*) 'SurfaceRunoff/fixed_lat_rad = ', fixed_lat_rad
-         write(japglog,*) 'SurfaceRunoff/fixed_lon_rad = ', fixed_lon_rad
-
-         do fi = 1, size(fixed_lat)
-            dist_fixed_lat(fi) = fixed_lat_rad(fi+1) - fixed_lat_rad(fi)
-            dist_fixed_lon(fi) = fixed_lon_rad(fi+1) - fixed_lon_rad(fi)
-         end do         
          
-         write(japglog,*) 'SurfaceRunoff/dist_fixed_lat = ', dist_fixed_lat  
-         write(japglog,*) 'SurfaceRunoff/dist_fixed_lon = ', dist_fixed_lon  
+         ! if (c .eq. 1) fsat(c) = 1.0 * exp(-3.0_r8/elevations_cols(1)*(zwt(c)))
+         ! if (c .eq. 2) fsat(c) = 1.0 * exp(-3.0_r8/elevations_cols(2)*(zwt(c)))
+         ! if (c .eq. 3) fsat(c) = 1.0 * exp(-3.0_r8/elevations_cols(3)*(zwt(c)))
+         ! if (c .eq. 4) fsat(c) = 1.0 * exp(-3.0_r8/elevations_cols(4)*(zwt(c)))
 
-         fixed_col_elevetions = [upland_elevetion, transition_elevetion, wetland_elevetion, openwater_elevetion] ! japg [08-13-2025] elevetions for fixed coordinates
+         ! if (c < num_hydrologyc) then
+         !    fsat(c) = 1.0 * exp(-3.0_r8/elevations_cols(c)*(zwt(c)))
+         ! else if (c == num_hydrologyc) then
+         !    fsat(c) =  min(1.0 * exp(-3.0_r8/(elevations_cols(c))*(zwt(c)-h2osfc(c)/1000.+elevations_cols(c))), 1._r8)
+         ! end if 
+
+         ! if (c .lt. num_hydrologyc) then
+         !    fsat(c) = 1.0 * exp(-3.0_r8/elevations_cols(c)*(zwt(c)))
+         ! else if (c .eq. num_hydrologyc) then
+         !    fsat(c) =  min(1.0 * exp(-3.0_r8/(elevations_cols(c))*(zwt(c)-h2osfc(c)/1000.+elevations_cols(c))), 1._r8)
+         ! end if
+
+         ! if (c .lt. num_hydrologyc) fsat(c) = 1.0 * exp(-3.0_r8/elevations_cols(c)*(zwt(c)))
+         ! if (c .eq. num_hydrologyc) fsat(c) =  min(1.0 * exp(-3.0_r8/(elevations_cols(c))*(zwt(c)-h2osfc(c)/1000.+elevations_cols(c))), 1._r8)
+
+
+         write(japglog,*) 'SurfaceRunoof/ after computing fsat +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++'
+         ! write(japglog,*) 'SurfaceRunoof/ VALUES OF humhols_ht ---------'
+         ! write(japglog,*) 'SurfaceRunoof/humhol_ht = ', humhol_ht
+         ! write(japglog,*) 'SurfaceRunoof/humhol_ht_frac = ', humhol_ht_frac
+         ! write(japglog,*) 'SurfaceRunoof/humhol_ht_2frac = ', humhol_ht_2frac
+
+         write(japglog,*) 'SurfaceRunoof/ VALUES OF elevations for all ------------------'
+         write(japglog,*) 'SurfaceRunoof/ vector of humhols =', [humhol_ht*humhol_ht_frac, humhol_ht*humhol_ht_2frac, humhol_ht, 0.0_r8] 
+         write(japglog,*) 'SurfaceRunoof/elevations = ', elevations_cols                 
          
-         do fi = 1, size(fixed_lat)-1
-            a_tide = sin(dist_fixed_lat(fi)/2.0_r8)**2 + cos(fixed_lat_rad(fi)) * cos(fixed_lat_rad(fi+1)) * sin(dist_fixed_lon(fi)/2.0_r8)**2            
-            c_tide = 2.0_r8 * atan2(sqrt(a_tide), sqrt(1.0_r8 - a_tide))
 
-            dist_fixed_col(fi) = R_tide * c_tide
+         ! write(japglog,*) 'SurfaceRunoof/fsat_japg                = ', fsat_japg
+         write(japglog,*) 'SurfaceRunoof/fsat                     = ', fsat(1:4)
+         write(japglog,*) 'SurfaceRunoof/ after computing fsat +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++'
 
-            slope_fixed_coor(fi) = (fixed_col_elevetions(fi)-fixed_col_elevetions(fi+1)) / dist_fixed_col(fi) ! japg [08-13-2025] slope from upland to wetland
-         end do            
-         
-         write(japglog,*)'SurfaceRunoff: dist_fixed_col = ', dist_fixed_col  ! japg [08-13-2025]
-         write(japglog,*)'SurfaceRunoff: slope_fixed_coor = ', slope_fixed_coor  ! japg [08-13-2025]
-                  
+         ! write(japglog,*) 'SurfaceRunoof/ fsat = ',fsat
+         ! write(japglog,*) 'SurfaceRunoof/ fsat_japg = ',fsat_japg
 
-         ! For all the coordinates vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+         ! fsat_japg(c) = 1.0 * exp(-3.0_r8/elevations_cols(c)*(zwt(c))) 
 
-         do ic = 1, num_hydrologyc                  
-                  if (loncoor(ic) > 180.0_r8) loncoor(ic) = loncoor(ic) - 360.0_r8
-         end do
-         
-         write(japglog,*) 'SurfaceRunoof/loncoor = ', loncoor
-         write(japglog,*) 'SurfaceRunoof/latcoor = ', latcoor 
 
-         lat_rad = latcoor * (acos(-1.0_r8) / 180.0_r8)
-         lon_rad = loncoor * (acos(-1.0_r8) / 180.0_r8)         
 
-         write(japglog,*) 'SurfaceRunoof/lat_rad = ', lat_rad  
-         write(japglog,*) 'SurfaceRunoof/lon_rad = ', lon_rad  
-
-         ! Compute differences between consecutive points
-         do ic = 1, num_hydrologyc-1
-            dist_lat(ic) = lat_rad(ic+1) - lat_rad(ic)
-            dist_lon(ic) = lon_rad(ic+1) - lon_rad(ic)
-         end do
-
-         write(japglog,*) 'SurfaceRunoof/dist_lat = ', dist_lat
-         write(japglog,*) 'SurfaceRunoof/dist_lon = ', dist_lon
-
-         do ic = 1, num_hydrologyc-1
-            a_tide = sin(dist_lat(ic)/2.0_r8)**2 + cos(lat_rad(ic)) * cos(lat_rad(ic+1)) * sin(dist_lon(ic)/2.0_r8)**2
-            c_tide = 2.0_r8 * atan2(sqrt(a_tide), sqrt(1.0_r8 - a_tide))
-            dist_col(ic) = R_tide * c_tide        
-
-         end do            
-
-         write(japglog,*) 'SurfaceRunoof/dist_col = ', dist_col  
-           
-
-         ! japg [08-13-2025]: Probabilty of saturation ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
 
 
          
