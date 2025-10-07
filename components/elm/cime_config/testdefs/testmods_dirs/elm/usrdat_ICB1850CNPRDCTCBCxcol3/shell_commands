@@ -1,0 +1,10 @@
+./xmlchange LND_DOMAIN_FILE=domain.lnd.3x1pt_US-GC3_navy.nc
+./xmlchange ATM_DOMAIN_FILE=domain.lnd.3x1pt_US-GC3_navy.nc
+./xmlchange LND_DOMAIN_PATH="\$DIN_LOC_ROOT/share/domains/domain.clm"
+./xmlchange ATM_DOMAIN_PATH="\$DIN_LOC_ROOT/share/domains/domain.clm"
+./xmlchange ELM_USRDAT_NAME=3x1pt_US-GC3_navy
+./xmlchange NTASKS=1
+./xmlchange ELM_CONFIG_OPTS="-phys elm -cppdefs ' -DMODAL_AER -DMARSH'"
+echo "
+string(APPEND CPPDEFS " -DCPL_BYPASS")
+">>cmake_macros/universal.cmake

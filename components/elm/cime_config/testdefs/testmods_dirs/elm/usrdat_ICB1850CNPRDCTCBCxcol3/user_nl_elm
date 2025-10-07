@@ -1,0 +1,9 @@
+&clm_inparm
+ fsurdat = '$DIN_LOC_ROOT/lnd/clm2/surfdata_map/surfdata_3x1pt_US-GC3_simyr1850.nc'
+ nyears_ad_carbon_only = 25
+ spinup_mortality_factor = 10
+ metdata_type = 'gswp3'
+ metdata_bypass = '$DIN_LOC_ROOT/atm/datm7/atm_forcing.datm7.GSWP3.0.5d.v2.c180716_US-GC03-GRID/cpl_bypass_full'
+ co2_file = '$DIN_LOC_ROOT/atm/datm7/CO2/fco2_datm_rcp4.5_1765-2500_c130312.nc'
+ aero_file = '$DIN_LOC_ROOT/atm/cam/chem/trop_mozart_aero/aero/aerosoldep_rcp4.5_monthly_1849-2104_1.9x2.5_c100402.nc'
+ stream_fldfilename_ndep = '$DIN_LOC_ROOT/lnd/clm2/ndepdata/fndep_elm_cbgc_exp_simyr1849-2101_1.9x2.5_ssp245_c240903.nc'
