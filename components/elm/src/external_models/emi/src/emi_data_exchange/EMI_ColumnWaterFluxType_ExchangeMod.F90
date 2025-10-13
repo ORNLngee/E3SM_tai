@@ -39,7 +39,7 @@ contains
         num_filter, filter, col_wf)
     !
     ! !DESCRIPTION:
-    ! Pack data from ALM col_wf for EM
+    ! Pack data from ELM col_wf for EM
     !
     ! !USES:
     use elm_varpar             , only : nlevgrnd
