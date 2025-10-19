@@ -100,6 +100,7 @@ _TESTS = {
             "SMS_Ly2_P1x1_D.1x1_smallvilleIA.IELMCNCROP.elm-lulcc_sville",
             "ERS_Ly10.ELM_USRDAT.I1850CNPRDCTCBC.elm-alquimia_emitest_I1850CNPRDCTCBC",
             "ERS_Ly10.ELM_USRDAT.I1850CNPRDCTCBC.elm-usrdat_I1850CNPRDCTCBC42sites",
+            "ERS_Ly10.ELM_USRDAT.I1850CNPRDCTCBC.elm-usrdat_I1850CNPRDCTCBCxcol2",
             "ERS_Ly10.ELM_USRDAT.I1850CNPRDCTCBC.elm-usrpft_arctic_I1850CNPRDCTCBC",
             "ERS_Ly10.ELM_USRDAT.I1850CNPRDCTCBC.elm-usrpft_onsetgdd_I1850CNPRDCTCBC",
             "ERS.ELM_USRDAT.I1850CNPRDCTCBC.elm-usrpft_codetest_I1850CNPRDCTCBC",
