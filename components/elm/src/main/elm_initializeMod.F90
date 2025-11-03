@@ -15,13 +15,13 @@ module elm_initializeMod
   use elm_varctl       , only : use_fates, use_betr, use_fates_sp, use_fan, use_alquimia, use_fates_luh
   use elm_varsur       , only : wt_lunit, urban_valid, wt_nat_patch, wt_cft, wt_glc_mec, topo_glc_mec,firrig,f_surf,f_grd
   use elm_varsur       , only : fert_cft, fert_p_cft, wt_polygon
-  use elm_varsur       , only : wt_tunit, elv_tunit, slp_tunit,asp_tunit,num_tunit_per_grd
+  use elm_varsur       , only : wt_tunit, elv_tunit, dist_tunit, regional_target_tunit, slp_tunit, asp_tunit, bog_tunit
+  use elm_varsur       , only : peat_depth_tunit, till_ksat_tunit, num_tunit_per_grd
   use perf_mod         , only : t_startf, t_stopf
   !use readParamsMod    , only : readParameters
   use readParamsMod    , only : readSharedParameters, readPrivateParameters
   use ncdio_pio        , only : file_desc_t
   use ELMFatesInterfaceMod  , only : ELMFatesGlobals1,ELMFatesGlobals2
-  use ELMFatesParamInterfaceMod, only: FatesReadPFTs
   use BeTRSimulationELM, only : create_betr_simulation_elm
   !
   !-----------------------------------------
@@ -288,8 +288,13 @@ contains
     allocate (wt_polygon (begg:endg,1:max_topounits, max_polygon))
     allocate (wt_tunit  (begg:endg,1:max_topounits  ))
     allocate (elv_tunit (begg:endg,1:max_topounits  ))
+    allocate (dist_tunit(begg:endg,1:max_topounits  ))
+    allocate (regional_target_tunit(begg:endg,1:max_topounits))
     allocate (slp_tunit (begg:endg,1:max_topounits  ))
     allocate (asp_tunit (begg:endg,1:max_topounits  ))
+    allocate (bog_tunit (begg:endg,1:max_topounits  ))
+    allocate (peat_depth_tunit (begg:endg,1:max_topounits  ))
+    allocate (till_ksat_tunit  (begg:endg,1:max_topounits  ))
     allocate (num_tunit_per_grd (begg:endg))
     allocate (firrig  (begg:endg,1:max_topounits  ))
     allocate (f_surf  (begg:endg,1:max_topounits  ))
@@ -309,14 +314,6 @@ contains
 
     call soilorder_conrd()
 
-    ! Read in FATES parameter values early in the call sequence as well
-    ! The PFT file, specifically, will dictate how many pfts are used
-    ! in fates, and this will influence the amount of memory we
-    ! request from the model, which is relevant in set_fates_global_elements()
-    if (use_fates) then
-       call FatesReadPFTs()
-    end if
-    
     ! Read surface dataset and set up subgrid weight arrays
     call surfrd_get_data(begg, endg, ldomain, fsurdat)
 
@@ -435,7 +432,8 @@ contains
 
     !deallocate (wt_lunit, wt_cft, wt_glc_mec)
     deallocate (wt_cft, wt_glc_mec)    !wt_lunit not deallocated because it is being used in CanopyHydrologyMod.F90
-    deallocate (wt_tunit, elv_tunit, slp_tunit, asp_tunit,num_tunit_per_grd)
+    deallocate (wt_tunit, elv_tunit, dist_tunit, regional_target_tunit, slp_tunit, asp_tunit, bog_tunit, peat_depth_tunit, &
+         till_ksat_tunit, num_tunit_per_grd)
     deallocate (wt_polygon) ! RF - might be used elsewhere, not sure if we want to deallocate here.
     call t_stopf('elm_init1')
 
@@ -525,12 +523,9 @@ contains
     use ELMFatesInterfaceMod  , only: ELMFatesTimesteps
     use FATESFireFactoryMod   , only : scalar_lightning
     use FanStreamMod          , only : fanstream_init, fanstream_interp
-<<<<<<< HEAD
     use dynFATESLandUseChangeMod, only : dynFatesLandUseInit
-=======
     use ExternalModelConstants   , only : EM_ID_ALQUIMIA, EM_ALQUIMIA_COLDSTART_STAGE
     use ExternalModelInterfaceMod, only : EMI_Driver, EMI_Init_EM
->>>>>>> 6f26ff2160 (Set up initial Alquimia external model interface and demo simulation including C and N pools)
     !
     ! !ARGUMENTS
     implicit none
@@ -736,6 +731,8 @@ contains
     call veg_es%InitAccBuffer(bounds_proc)
 
     call canopystate_vars%initAccBuffer(bounds_proc)
+
+    call energyflux_vars%initAccBuffer(bounds_proc)
 
     if (crop_prog) then
        call crop_vars%initAccBuffer(bounds_proc)
@@ -974,6 +971,7 @@ contains
     call top_af%InitAccVars(bounds_proc)
     call veg_es%InitAccVars(bounds_proc)
     call canopystate_vars%initAccVars(bounds_proc)
+    call energyflux_vars%initAccVars(bounds_proc)
     if (crop_prog) then
        call crop_vars%initAccVars(bounds_proc)
     end if
@@ -1008,7 +1006,8 @@ contains
 
     if (nsrest == nsrStartup) then
        call t_startf('init_map2gc')
-       call lnd2atm_minimal(bounds_proc, surfalb_vars, energyflux_vars, lnd2atm_vars)
+       call lnd2atm_minimal(bounds_proc, surfalb_vars, solarabs_vars, energyflux_vars, &
+            atm2lnd_vars, lnd2atm_vars)
        call t_stopf('init_map2gc')
     end if
 

@@ -9,7 +9,7 @@ module AllocationMod
   use shr_kind_mod        , only : r8 => shr_kind_r8
   use shr_log_mod         , only : errMsg => shr_log_errMsg
   use elm_varcon          , only : dzsoi_decomp
-  use elm_varctl          , only : use_c13, use_c14, spinup_state
+  use elm_varctl          , only : use_c13, use_c14, spinup_state, use_humhol
   use elm_varctl          , only : nyears_ad_carbon_only
   use elm_varctl          , only : use_fates
   use abortutils          , only : endrun
@@ -385,7 +385,7 @@ contains
     use elm_varctl      , only : carbon_only          !
     use elm_varctl      , only : carbonnitrogen_only  !
     use elm_varctl      , only : carbonphosphorus_only!
-    use pftvarcon        , only: npcropmin, declfact, bfact, aleaff, arootf, astemf, noveg
+    use pftvarcon        , only: declfact, bfact, aleaff, arootf, astemf, noveg
     use pftvarcon        , only: arooti, fleafi, allconsl, allconss, grperc, grpnow, nsoybean
     use pftvarcon        , only: iscft, percrop, nwcereal, nwcerealirrig
     use elm_varpar       , only: nlevdecomp
@@ -593,6 +593,8 @@ contains
             mr = mr + livestem_mr(p) + livecroot_mr(p)
          else if (iscft(ivt(p))) then
             if (croplive(p)) mr = mr + livestem_mr(p) + grain_mr(p)
+         else
+            mr = mr + livecroot_mr(p)
          end if
 
          ! carbon flux available for allocation
@@ -630,27 +632,29 @@ contains
 
             xsmrpool_recover(p) = -xsmrpool(p)/(dayscrecover*secspday)
             !DMR note - Modification from orignial code to use cpool
-
-            !if (xsmrpool_recover(p) < availc(p)) then
-            !   ! available carbon reduced by amount for xsmrpool recovery
-            !   availc(p) = availc(p) - xsmrpool_recover(p)
-            !else
-            !   ! all of the available carbon goes to xsmrpool recovery
-            !   xsmrpool_recover(p) = availc(p)
-            !   availc(p) = 0.0_r8
-            if (cpool(p) < 10.0_r8 * xsmrpool_recover(p)*dt) then 
-               !Take xsmr recovery from existing cpool, if cpool too small then
-               !use availc
+            if (use_humhol) then
+               if (cpool(p) < 10.0_r8 * xsmrpool_recover(p)*dt) then
+                  !Take xsmr recovery from existing cpool, if cpool too small then
+                  !use availc
+                  if (xsmrpool_recover(p) < availc(p)) then
+                    ! available carbon reduced by amount for xsmrpool recovery
+                     availc(p) = availc(p) - xsmrpool_recover(p)
+                  else
+                     ! all of the available carbon goes to xsmrpool recovery
+                     xsmrpool_recover(p) = availc(p)
+                     availc(p) = 0.0_r8
+                  end if
+               end if
+            else
                if (xsmrpool_recover(p) < availc(p)) then
-                 ! available carbon reduced by amount for xsmrpool recovery
+                  ! available carbon reduced by amount for xsmrpool recovery
                   availc(p) = availc(p) - xsmrpool_recover(p)
                else
                   ! all of the available carbon goes to xsmrpool recovery
                   xsmrpool_recover(p) = availc(p)
                   availc(p) = 0.0_r8
                end if
- 
-            end if 
+            end if
             cpool_to_xsmrpool(p) = xsmrpool_recover(p)
          end if
 
@@ -2412,6 +2416,8 @@ contains
                 mr = mr + livestem_mr(p) + livecroot_mr(p)
              else if (iscft(ivt(p))) then
                 if (croplive(p)) mr = mr + livestem_mr(p) + grain_mr(p)
+             else
+                mr = mr + livecroot_mr(p)
              end if
 
              ! take mr from xsmrpool pool first
@@ -3815,11 +3821,11 @@ contains
                      nuptake_prof(c,j) = sminn_vr_loc(c,j) / sminn_tot(c) &
                         *(nfixation_prof(c,j)*dzsoi_decomp(j))         ! weighted by froot fractions in annual max. active layers
                   else
-#if (defined HUM_HOL)
-                     nuptake_prof(c,j) = nfixation_prof(c,j)
-#else
-                     nuptake_prof(c,j) = sminn_vr_loc(c,j) / sminn_tot(c)   !original:  nuptake_prof(c,j) = sminn_vr(c,j) / sminn_tot(c)
-#endif
+                     if (use_humhol) then
+                        nuptake_prof(c,j) = nfixation_prof(c,j)
+                     else
+                        nuptake_prof(c,j) = sminn_vr_loc(c,j) / sminn_tot(c)   !original:  nuptake_prof(c,j) = sminn_vr(c,j) / sminn_tot(c)
+                     end if
                   end if
                else
                   nuptake_prof(c,j) = nfixation_prof(c,j)
@@ -3873,11 +3879,11 @@ contains
                c = filter_soilc(fc)
                !!! add P demand calculation
                if (solutionp_tot(c)  >  0.) then
-#if (defined HUM_HOL)
-                  puptake_prof(c,j) = nfixation_prof(c,j)
-#else
-                  puptake_prof(c,j) = solutionp_vr(c,j) / solutionp_tot(c)
-#endif
+                  if (use_humhol) then
+                     puptake_prof(c,j) = nfixation_prof(c,j)
+                  else
+                     puptake_prof(c,j) = solutionp_vr(c,j) / solutionp_tot(c)
+                  end if
                else
                   puptake_prof(c,j) = nfixation_prof(c,j)      ! need modifications
                endif

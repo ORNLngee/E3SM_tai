@@ -16,6 +16,8 @@ module SoilLittVertTranspMod
   use ColumnDataType         , only : col_cs, c13_col_cs, c14_col_cs
   use ColumnDataType         , only : col_cf, c13_col_cf, c14_col_cf
   use ColumnDataType         , only : col_ns, col_nf, col_ps, col_pf
+  use ColumnType             , only : col_pp
+  use TopounitType           , only : top_pp
   use timeinfoMod
   !
   implicit none
@@ -23,6 +25,7 @@ module SoilLittVertTranspMod
   !
   public :: SoilLittVertTransp
   public :: readSoilLittVertTranspParams
+  public :: cleanupLitterTransportList
 
   type, private :: SoilLittVertTranspParamsType
      real(r8),pointer  :: som_diffus                => null() ! Soil organic matter diffusion
@@ -34,12 +37,9 @@ module SoilLittVertTranspMod
   !$acc declare create(SoilLittVertTranspParamsInst)
 
   !
-#if (defined HUM_HOL)
-  real(r8), public :: som_adv_flux =  0.0004_r8 / (86400_r8 * 365_r8)    ! m/s advection - long term peat accumulation rate at SPR
-#else
   real(r8), public :: som_adv_flux =  0._r8    ! m/s advection
-#endif
   !$acc declare copyin(som_adv_flux)
+  real(r8), parameter :: peat_adv_reference_depth = 3._r8 ! m reference depth for peat accumulation rate
   real(r8), public :: max_depth_cryoturb = 3._r8   ! (m) this is the maximum depth of cryoturbation
   !$acc declare copyin(max_depth_cryoturb)
   real(r8) :: som_diffus                   ! [m^2/sec] = 1 cm^2 / yr
@@ -51,6 +51,20 @@ module SoilLittVertTranspMod
   !-----------------------------------------------------------------------
 
 contains
+
+  !-----------------------------------------------------------------------
+  subroutine cleanupLitterTransportList()
+  !-----------------------------------------------------------------------
+    if (associated(SoilLittVertTranspParamsInst%som_diffus)) then
+       deallocate(SoilLittVertTranspParamsInst%som_diffus)
+    end if
+    if (associated(SoilLittVertTranspParamsInst%cryoturb_diffusion_k)) then
+       deallocate(SoilLittVertTranspParamsInst%cryoturb_diffusion_k)
+    end if
+    if (associated(SoilLittVertTranspParamsInst%max_altdepth_cryoturbation)) then
+       deallocate(SoilLittVertTranspParamsInst%max_altdepth_cryoturbation)
+    end if
+  end subroutine cleanupLitterTransportList
 
   !-----------------------------------------------------------------------
   subroutine readSoilLittVertTranspParams ( ncid )
@@ -77,9 +91,7 @@ contains
     !SoilLittVertTranspParamsInst%som_diffus=tempr
     ! FIX(SPM,032414) - can't be pulled out since division makes things not bfb
     SoilLittVertTranspParamsInst%som_diffus = 1e-4_r8 / (secspday * 365._r8)
-#if (defined HUM_HOL)
-    SoilLittVertTranspParamsInst%som_diffus = 0e-4_r8 / (secspday * 365._r8)
-#elif (defined MARSH)
+#if (defined MARSH)
     SoilLittVertTranspParamsInst%som_diffus = 5e-4_r8 / (secspday * 365._r8)
 #endif
 
@@ -153,11 +165,14 @@ contains
     real(r8) :: a_p_0
     real(r8) :: deficit
     integer  :: ntype
-    integer  :: i_type,s,fc,c,j,l             ! indices
+    integer  :: i_type,s,fc,c,j,l,t           ! indices
     integer  :: jtop(bounds%begc:bounds%endc) ! top level at each column
     integer  :: zerolev_diffus
     real(r8) :: spinup_term                   ! spinup accelerated decomposition factor, used to accelerate transport as well
     real(r8) :: epsilon                       ! small number
+    real(r8) :: peat_depth_factor             ! column peat depth / reference peat depth
+    real(r8) :: peat_adv_flux                 ! peat accumulation advection rate at the reference peat depth
+    logical  :: is_peatland_topounit          ! true when the current column belongs to a peat-depth topounit
 
 
     !-----------------------------------------------------------------------
@@ -180,6 +195,7 @@ contains
       som_diffus                 = SoilLittVertTranspParamsInst%som_diffus
       cryoturb_diffusion_k       = SoilLittVertTranspParamsInst%cryoturb_diffusion_k
       max_altdepth_cryoturbation = SoilLittVertTranspParamsInst%max_altdepth_cryoturbation
+      peat_adv_flux = 0.0004_r8 / (secspday * 365._r8)
 
       dtime = dtime_mod
       year = year_curr
@@ -218,13 +234,21 @@ contains
                   endif
                end do
             elseif (  max(altmax(c), altmax_lastyear(c)) > 0._r8 ) then
-               ! constant advection, constant diffusion
+               ! peat topounits get depth-scaled accumulation advection; uplands use standard diffusion
+               peat_depth_factor = 0._r8
+               t = col_pp%topounit(c)
+               if (t >= lbound(top_pp%peat_depth, 1) .and. t <= ubound(top_pp%peat_depth, 1)) then
+                  peat_depth_factor = max(top_pp%peat_depth(t), 0._r8) / peat_adv_reference_depth
+               endif
+               is_peatland_topounit = peat_depth_factor > 0._r8
                do j = 1,nlevdecomp+1
-                 som_adv_coef(c,j) = som_adv_flux
-#if (defined HUM_HOL)
-                 if (c == 2) som_adv_coef(c,j) = som_adv_flux*1.5_r8
-#endif
-                 som_diffus_coef(c,j) = som_diffus
+                 if (is_peatland_topounit) then
+                    som_adv_coef(c,j) = peat_adv_flux * peat_depth_factor
+                    som_diffus_coef(c,j) = 0._r8
+                 else
+                    som_adv_coef(c,j) = som_adv_flux
+                    som_diffus_coef(c,j) = som_diffus
+                 endif
                end do
             else
                ! completely frozen soils--no mixing

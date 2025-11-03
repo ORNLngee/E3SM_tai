@@ -11,7 +11,7 @@ module pftvarcon
   use abortutils  , only : endrun
   use elm_varpar  , only : mxpft, numrad, ivis, inir
   use elm_varpar  , only:  mxpft_nc
-  use elm_varctl  , only : iulog, use_vertsoilc
+  use elm_varctl  , only : iulog, use_vertsoilc, use_humhol
   use elm_varpar  , only : nlevdecomp_full, nsoilorder
   use elm_varctl  , only : nu_com
   !-------------------------------------------------------------------------------------------
@@ -34,6 +34,7 @@ module pftvarcon
   integer :: ndllf_evr_tmp_tree     !value for Needleleaf evergreen temperate tree
   integer :: ndllf_evr_brl_tree     !value for Needleleaf evergreen boreal tree
   integer :: ndllf_dcd_brl_tree     !value for Needleleaf deciduous boreal tree
+  integer :: npeat_ndllf_dcd_brl_tree = -1 !value for peatland Needleleaf deciduous boreal tree
   integer :: nbrdlf_evr_trp_tree    !value for Broadleaf evergreen tropical tree
   integer :: nbrdlf_evr_tmp_tree    !value for Broadleaf evergreen temperate tree
   integer :: nbrdlf_dcd_trp_tree    !value for Broadleaf deciduous tropical tree
@@ -43,6 +44,7 @@ module pftvarcon
   integer :: nbrdlf_evr_shrub       !value for Broadleaf evergreen shrub
   integer :: nbrdlf_dcd_tmp_shrub   !value for Broadleaf deciduous temperate shrub
   integer :: nbrdlf_dcd_brl_shrub   !value for Broadleaf deciduous boreal shrub
+  integer :: npeat_nbrdlf_dcd_brl_shrub = -1 !value for peatland Broadleaf deciduous boreal shrub
   integer :: nc3_arctic_grass       !value for C3 arctic grass
   integer :: nc3_nonarctic_grass    !value for C3 non-arctic grass
   integer :: nc4_grass              !value for C4 grass
@@ -329,6 +331,11 @@ module pftvarcon
   real(r8)              :: humhol_ht
   real(r8)              :: hum_frac
   real(r8)              :: humhol_dist
+  real(r8)              :: vpd_max_moss
+  real(r8)              :: vpd_min_moss
+  real(r8)              :: blower_u0           ! reference blower wind magnitude at surface [m/s]
+  real(r8)              :: blower_lambda       ! vertical decay e-folding length [m]
+  real(r8)              :: vwc_moss_offset
 ! Tidal cycle controls
   integer               :: num_tide_comps      ! Number of tidal cycle components
   real(r8)              :: tide_baseline            ! Base tide level (mean of cycle) (mm)
@@ -1136,7 +1143,17 @@ contains
     call ncd_io('hum_frac', hum_frac, 'read', ncid, readvar=readv, posNOTonfile=.true.)
     if ( .not. readv) hum_frac = 0.5_r8
     call ncd_io('qflx_h2osfc_surfrate', qflx_h2osfc_surfrate, 'read', ncid, readvar=readv, posNOTonfile=.true.)
-    if ( .not. readv) qflx_h2osfc_surfrate = 1.0e-7_r8
+    if ( .not. readv) qflx_h2osfc_surfrate = 8.9192395533995e-8_r8
+    call ncd_io('vpd_max_moss', vpd_max_moss, 'read', ncid, readvar=readv, posNOTonfile=.true.)
+    if ( .not. readv) vpd_max_moss = 1500.0_r8
+    call ncd_io('vpd_min_moss', vpd_min_moss, 'read', ncid, readvar=readv, posNOTonfile=.true.) 
+    if ( .not. readv) vpd_min_moss = 1000.0_r8
+    call ncd_io('blower_u0', blower_u0, 'read', ncid, readvar=readv, posNOTonfile=.true.)
+    if ( .not. readv) blower_u0 = 0.0_r8
+    call ncd_io('blower_lambda', blower_lambda, 'read', ncid, readvar=readv, posNOTonfile=.true.)
+    if ( .not. readv) blower_lambda = 2.0_r8
+    call ncd_io('vwc_moss_offset', vwc_moss_offset, 'read', ncid, readvar=readv, posNOTonfile=.true.)
+    if ( .not. readv) vwc_moss_offset = 0.0_r8
 
 #ifdef MARSH
 ! Tidal cycle parameters
@@ -1261,13 +1278,13 @@ contains
     call ncd_io('br_xr', br_xr, 'read', ncid, readvar=readv, posNOTonfile=.true.)
     !if ( .not. readv) call endrun(msg='ERROR:  error in reading in pft data'//errMsg(__FILE__,__LINE__))
     if (.not. readv) br_xr(:) = 0._r8
-#if (defined HUM_HOL)
-    call ncd_io('br_mr_pft', br_mr_pft(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-    if ( .not. readv) call endrun(msg='ERROR:  error in reading in pft data'//errMsg(__FILE__,__LINE__))
-    call ncd_io('q10_mr_pft', q10_mr_pft(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-    if ( .not. readv) call endrun(msg='ERROR:  error in reading in pft data'//errMsg(__FILE__,__LINE__))
-    !q10_mr(:) = q10_mrtmp 
-#endif
+    if (use_humhol) then
+      call ncd_io('br_mr_pft', br_mr_pft(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
+      if ( .not. readv) call endrun(msg='ERROR:  error in reading in pft data'//errMsg(__FILE__,__LINE__))
+      call ncd_io('q10_mr_pft', q10_mr_pft(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
+      if ( .not. readv) call endrun(msg='ERROR:  error in reading in pft data'//errMsg(__FILE__,__LINE__))
+      !q10_mr(:) = q10_mrtmp
+    end if
     call ncd_io('crit_gdd1', crit_gdd1, 'read', ncid, readvar=readv, posNOTonfile=.true.)
     if (.not. readv) crit_gdd1(:) = 4.8_r8
     call ncd_io('crit_gdd2', crit_gdd2, 'read', ncid, readvar=readv, posNOTonfile=.true.)
@@ -1391,6 +1408,13 @@ contains
     do i=0, mxpft
        if (temp_iscft(i) == 1._r8) iscft(i) = .true.
        if (temp_iscft(i) == 0._r8) iscft(i) = .false.
+    end do
+
+    npeat_ndllf_dcd_brl_tree = -1
+    npeat_nbrdlf_dcd_brl_shrub = -1
+    do i = 0, npft-1
+       if (trim(pftname(i)) == 'peatlnd_needleleaf_deciduous_boreal_tree') npeat_ndllf_dcd_brl_tree = i
+       if (trim(pftname(i)) == 'peatlnd_broadleaf_deciduous_boreal_shrub') npeat_nbrdlf_dcd_brl_shrub = i
     end do
 
    if ( PFT_DEFAULT ) then
@@ -1827,4 +1851,3 @@ contains
   end subroutine set_num_cfts_known_to_model
 
 end module pftvarcon
-

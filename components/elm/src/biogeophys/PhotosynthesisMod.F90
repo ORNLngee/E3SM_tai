@@ -11,7 +11,7 @@ module  PhotosynthesisMod
   use shr_kind_mod        , only : r8 => shr_kind_r8
   use shr_log_mod         , only : errMsg => shr_log_errMsg
   use abortutils          , only : endrun
-  use elm_varctl          , only : iulog, use_c13, use_c14, use_cn, use_fates
+  use elm_varctl          , only : iulog, use_c13, use_c14, use_cn, use_fates, use_humhol
   use elm_varpar          , only : nlevcan
   use elm_varctl          , only : use_hydrstress
   use elm_varpar          , only : nvegwcs, mxpft_nc, mxpft
@@ -227,6 +227,7 @@ contains
     use elm_varcon     , only : rgas, tfrz
     use elm_varctl     , only : carbon_only
     use pftvarcon      , only : vcmax_np1, vcmax_np2, vcmax_np3, vcmax_np4, jmax_np1, jmax_np2, jmax_np3
+    use pftvarcon      , only : vpd_max_moss, vpd_min_moss
     !
     ! !ARGUMENTS:
     type(bounds_type)      , intent(in)    :: bounds
@@ -360,7 +361,7 @@ contains
     real(r8) :: sum_nscaler
     real(r8) :: total_lai
     integer  :: rad_layers_patch
-    real(r8) :: wcscaler
+    real(r8) :: wcscaler, vpd_pa, vpd_stress
     !------------------------------------------------------------------------------
     ! Temperature and soil water response functions
 
@@ -370,10 +371,8 @@ contains
          flnr          => veg_vp%flnr                          , & ! Input:  [real(r8) (:)   ]  fraction of leaf N in the Rubisco enzyme (gN Rubisco / gN leaf)
          fnitr         => veg_vp%fnitr                         , & ! Input:  [real(r8) (:)   ]  foliage nitrogen limitation factor (-)
          slatop        => veg_vp%slatop                        , & ! Input:  [real(r8) (:)   ]  specific leaf area at top of canopy, projected area basis [m^2/gC]
-#if defined (HUM_HOL)
          br_mr         => veg_vp%br_mr_pft                     , &
          q10_mr        => veg_vp%q10_mr_pft                    , &
-#endif
 
          forc_pbot     => top_as%pbot                              , & ! Input:  [real(r8) (:)   ]  atmospheric pressure (Pa)
 
@@ -529,19 +528,40 @@ contains
          end if
 
          ! Soil water stress applied to Ball-Berry parameters
-#if (defined HUM_HOL)
-         if (veg_pp%itype(p) == 12) then
-             bbb(p) = (-0.195 + 0.134*(h2o_moss_wc(p)+1._r8) - &
+         if (use_humhol .and. nint(veg_vp%nonvascular(veg_pp%itype(p))) == 1) then
+            !Surface conductance is a function of moss water content
+            bbb(p) = (-0.195 + 0.134*(h2o_moss_wc(p)+1._r8) - &
                      0.0256*(h2o_moss_wc(p) + 1.0_r8)**2  &
                  + 0.00228 * (h2o_moss_wc(p) + 1.0_r8)**3 &
                   -0.0000984*(h2o_moss_wc(p) + 1.0_r8)**4 + 0.00000168* &
                   (h2o_moss_wc(p) + 1._r8)**5)*1.e06_r8/0.634_r8
-           if (bbb(p) .lt.(0.005*1.e06_r8/0.634_r8)) bbb(p) = 0.005*1.e06_r8/0.634_r8
-           if (bbb(p) .gt.(0.07*1.e06_r8/0.634_r8)) bbb(p) = 0.07*1.e06_r8/0.634_r8
-           mbb(p) = 0.0_r8
+            if (bbb(p) .lt.(0.005*1.e06_r8/0.634_r8)) bbb(p) = 0.005*1.e06_r8/0.634_r8
+            if (bbb(p) .gt.(0.07*1.e06_r8/0.634_r8)) bbb(p) = 0.07*1.e06_r8/0.634_r8
+            !Scalar to be applied to vcmax and jmax for moss water content
+            !Similar to btran for vascular plants
+            if (h2o_moss_wc(p) > 0._r8) then 
+              wcscaler = (-0.656_r8 + 1.654_r8 *log10(h2o_moss_wc (p)))
+            else
+              wcscaler = 0._r8
+            end if
+            !Add VPD scaling (atmospheric demand effects on cell structure)
+            vpd_pa = max(0._r8, esat_tv(p) - eair(p))
+            !vpd_stress = exp(-vpd_pa / 800.0_r8) !  ~0.8 kPa threshold
+            if (vpd_pa <= vpd_min_moss) then
+              vpd_stress = 1.0_r8  ! No stress
+            else if (vpd_pa >= vpd_max_moss) then
+              vpd_stress = 0.1_r8  ! Maximum stress (retain 10% function)
+            else
+              ! Linear decline between min and max
+              vpd_stress = 1.0_r8 - 0.9_r8 * (vpd_pa - vpd_min_moss) / (vpd_max_moss - vpd_min_moss)
+            end if
+            wcscaler = max(0._r8, min(1.0_r8, wcscaler*vpd_stress))
+            !No slope term for mosses
+            bbb(p) = max (bbb(p)*wcscaler, 1._r8)
+            mbb(p) = 0.0_r8
          else
-           bbb(p) = max (bbbopt(p)*btran(p), 1._r8)
-           mbb(p) = mbbopt(p)
+            bbb(p) = max (bbbopt(p)*btran(p), 1._r8)
+            mbb(p) = mbbopt(p)
          end if
 !#elseif (defined MARSH)
          !salinity(c) = 30.0_r8
@@ -552,10 +572,6 @@ contains
          !   bbb(p) = max (bbbopt(p)*btran(p), 1._r8)
          !   mbb(p) = mbbopt(p)
          !end if
-#else
-         bbb(p) = max (bbbopt(p)*btran(p), 1._r8)
-         mbb(p) = mbbopt(p)
-#endif
 
          ! kc, ko, cp, from: Bernacchi et al (2001) Plant, Cell and Environment 24:253-259
          !
@@ -738,11 +754,11 @@ contains
             ! Then scale this value at the top of the canopy for canopy depth
 
             lmr25top = 2.525e-6_r8 * (ParamsShareInst%Q10_mr ** ((25._r8 - 20._r8)/10._r8))
-#if (defined HUM_HOL)
-            lmr25top = br_mr(veg_pp%itype(p)) * q10_mr(veg_pp%itype(p)) **((25._r8 - 20._r8)/10._r8)
-#else
-            lmr25top = 2.525e-6_r8 * (ParamsShareInst%Q10_mr ** ((25._r8 - 20._r8)/10._r8))
-#endif
+            if (use_humhol) then
+               lmr25top = br_mr(veg_pp%itype(p)) * q10_mr(veg_pp%itype(p)) **((25._r8 - 20._r8)/10._r8)
+            else
+               lmr25top = 2.525e-6_r8 * (ParamsShareInst%Q10_mr ** ((25._r8 - 20._r8)/10._r8))
+            end if
             lmr25top = lmr25top * lnc(p) / 12.e-06_r8
          else
             ! Leaf maintenance respiration in proportion to vcmax25top
@@ -780,11 +796,11 @@ contains
 
             lmr25 = lmr25top * nscaler
             if (c3flag(p)) then
-#if (defined HUM_HOL)
-               lmr_z(p,iv) = lmr25 * q10_mr(veg_pp%itype(p))**((t_veg(p)-(tfrz+25._r8))/10._r8)
-#else
-               lmr_z(p,iv) = lmr25 * ft(t_veg(p), lmrha) * fth(t_veg(p), lmrhd, lmrse, lmrc)
-#endif
+               if (use_humhol) then
+                  lmr_z(p,iv) = lmr25 * q10_mr(veg_pp%itype(p))**((t_veg(p)-(tfrz+25._r8))/10._r8)
+               else
+                  lmr_z(p,iv) = lmr25 * ft(t_veg(p), lmrha) * fth(t_veg(p), lmrhd, lmrse, lmrc)
+               end if
             else
                lmr_z(p,iv) = lmr25 * 2._r8**((t_veg(p)-(tfrz+25._r8))/10._r8)
                lmr_z(p,iv) = lmr_z(p,iv) / (1._r8 + exp( 1.3_r8*(t_veg(p)-(tfrz+55._r8)) ))
@@ -812,6 +828,11 @@ contains
 
                vcmaxse = 668.39_r8 - 1.07_r8 * min(max((t10(p)-tfrz),11._r8),35._r8)
                jmaxse  = 659.70_r8 - 0.75_r8 * min(max((t10(p)-tfrz),11._r8),35._r8)
+               if (use_humhol .and. nint(veg_vp%nonvascular(veg_pp%itype(p))) == 1) then
+                  ! Moss-specific temperature acclimation (narrower range, lower optimum)
+                  vcmaxse = 673.39_r8 - 0.54_r8 * min(max((t10(p)-tfrz),5._r8),15._r8)
+                  jmaxse  = 664.70_r8 - 0.65_r8 * min(max((t10(p)-tfrz),5._r8),15._r8)
+               end if
                tpuse = vcmaxse
                vcmaxc = fth25 (vcmaxhd, vcmaxse)
                jmaxc  = fth25 (jmaxhd, jmaxse)
@@ -831,9 +852,13 @@ contains
             end if
 
             ! Adjust for soil water
-
-            vcmax_z(p,iv) = vcmax_z(p,iv) * btran(p)
-            lmr_z(p,iv) = lmr_z(p,iv) * btran(p) !will this carry over from the earlier if marsh statement? -SLL 4-8-21
+            if (use_humhol .and. nint(veg_vp%nonvascular(veg_pp%itype(p))) == 1) then
+               vcmax_z(p,iv) = vcmax_z(p,iv) * wcscaler
+               lmr_z(p,iv) = lmr_z(p,iv) * wcscaler
+            else
+               vcmax_z(p,iv) = vcmax_z(p,iv) * btran(p)
+               lmr_z(p,iv) = lmr_z(p,iv) * btran(p) !will this carry over from the earlier if marsh statement? -SLL 4-8-21
+            end if
 
             ! output variable
             vcmax25_top(p) = vcmax25top
@@ -857,26 +882,9 @@ contains
          gb = 1._r8/rb(p)
          gb_mol(p) = gb * cf
 
-         !Dessication and submergence scalaers for moss photosynthesis
-#if (defined HUM_HOL)
-         if (veg_pp%itype(p) == 12)then
-            if (h2o_moss_wc(p) > 0) then 
-              wcscaler = (-0.656_r8 + 1.654_r8 *log10(h2o_moss_wc (p)))
-            else
-              wcscaler = 0._r8
-            end if
-              !DMR 05/11/17 - add scaler for submergence effect
-            !wcscaler = wcscaler * (1.0_r8 - min(h2osfc(c),50.0_r8)/50.0_r8)
-            wcscaler = max(0._r8, min(1.0_r8, wcscaler))
-         endif
-#endif
-
          ! Loop through canopy layers (above snow). Only do calculations if daytime
          do iv = 1, nrad(p)
 
-#if (defined HUM_HOL)
-           if (veg_pp%itype(p) == 12) lmr_z(p,iv) = lmr_z(p,iv) * wcscaler
-#endif
            if (par_z(p,iv) <= 0._r8) then           ! night time
 
                ac(p,iv) = 0._r8
@@ -934,19 +942,11 @@ contains
                ! End of ci iteration.  Check for an < 0, in which case gs_mol = bbb
 
                if (an(p,iv) < 0._r8) gs_mol(p,iv) = bbb(p)
-#if (defined HUM_HOL)
-               if (veg_pp%itype(p) == 12) gs_mol(p,iv) = bbb(p)
-#endif
                ! Final estimates for cs and ci (needed for early exit of ci iteration when an < 0)
 
                cs = cair(p) - 1.4_r8/gb_mol(p) * an(p,iv) * forc_pbot(t)
                cs = max(cs,1.e-06_r8)
                ci_z(p,iv) = cair(p) - an(p,iv) * forc_pbot(t) * (1.4_r8*gs_mol(p,iv)+1.6_r8*gb_mol(p)) / (gb_mol(p)*gs_mol(p,iv))
-#if (defined HUM_HOL)
-               if (veg_pp%itype(p) == 12) then
-                  ci_z(p,iv) = cair(p)-an(p,iv) * forc_pbot(c)/gs_mol(p,iv)
-               endif
-#endif
                ! Convert gs_mol (umol H2O/m**2/s) to gs (m/s) and then to rs (s/m)
 
                gs = gs_mol(p,iv) / cf
@@ -1016,15 +1016,7 @@ contains
             psncan_wj = psncan_wj + psn_wj_z(p,iv) * lai_z(p,iv)
             psncan_wp = psncan_wp + psn_wp_z(p,iv) * lai_z(p,iv)
             lmrcan = lmrcan + lmr_z(p,iv) * lai_z(p,iv)
-#if (defined HUM_HOL)
-            if (veg_pp%itype(p) == 12) then
-               gscan = gscan + lai_z(p,iv) / rs_z(p,iv)
-            else
-               gscan = gscan + lai_z(p,iv) / (rb(p)+rs_z(p,iv))
-            endif
-#else
             gscan = gscan + lai_z(p,iv) / (rb(p)+rs_z(p,iv))
-#endif
             laican = laican + lai_z(p,iv)
          end do
          if (laican > 0._r8) then
@@ -1626,22 +1618,6 @@ contains
       call quadratic (aquad, bquad, cquad, r1, r2)
       ag(p,iv) = min(r1,r2)
 
-      !Dessication and submergence effects for moss PFT
-#if (defined HUM_HOL)
-      if (veg_pp%itype(p) == 12)then
-         if (h2o_moss_wc(p) > 0) then 
-           wcscaler = (-0.656_r8 + 1.654_r8 *log10(h2o_moss_wc (p)))
-         else
-           wcscaler = 0._r8
-         end if
-         !DMR 05/11/17 - add scaler for submergence effect
-         !wcscaler = wcscaler * (1.0_r8 - min(h2osfc(c),50.0_r8)/50.0_r8)
-         wcscaler = max(0._r8, min(1.0_r8, wcscaler))
-         ag(p,iv) = ag(p,iv) * wcscaler
-         !if (h2osfc(c) > 0) print*, 'AG', c, h2osfc(c), wcscaler
-      endif
-#endif
-
       ! Net photosynthesis. Exit iteration if an < 0
 
       an(p,iv) = ag(p,iv) - lmr_z
@@ -1659,15 +1635,9 @@ contains
       cquad = -gb_mol*(cs*bbb(p) + mbb(p)*an(p,iv)*forc_pbot(t)*rh_can)
       call quadratic (aquad, bquad, cquad, r1, r2)
       gs_mol = max(r1,r2)
-#if (defined HUM_HOL)
-      if (veg_pp%itype(p) == 12) gs_mol = bbb(p)
-#endif
-      ! Derive new estimate for ci
 
+      ! Derive new estimate for ci
       fval =ci - cair + an(p,iv) * forc_pbot(t) * (1.4_r8*gs_mol+1.6_r8*gb_mol) / (gb_mol*gs_mol)
-#if (defined HUM_HOL)
-      if (veg_pp%itype(p) == 12) fval = ci - cair + an(p,iv) *forc_pbot(c)/gs_mol
-#endif
     end associate
 
   end subroutine ci_func
@@ -1946,10 +1916,8 @@ contains
          stem_leaf     => veg_vp%stem_leaf                         , & ! allocation parameter: new stem c per new leaf C (gC/gC)
          froot_leaf     => veg_vp%froot_leaf                         , & ! allocation parameter: new fine root C per new leaf C (gC/gC)
          croot_stem     => veg_vp%croot_stem                         , & ! allocation parameter: new coarse root C per new stem C (gC/gC)
-#if defined (HUM_HOL)
          br_mr      => veg_vp%br_mr_pft                          ,&       
          q10_mr     => veg_vp%q10_mr_pft                         ,&
-#endif
          forc_pbot  => top_as%pbot                           , & ! Input:  [real(r8) (:)   ]  atmospheric pressure (Pa)
 
          t_veg         => veg_es%t_veg             , & ! Input:  [real(r8) (:)   ]  vegetation temperature (Kelvin)
@@ -2360,11 +2328,11 @@ contains
             !
             ! Then scale this value at the top of the canopy for canopy depth
 
-#if defined (HUM_HOL)
-            lmr25top = br_mr(veg_pp%itype(p)) * q10_mr(veg_pp%itype(p)) ** ((25._r8 - 20._r8)/10._r8)
-#else
-            lmr25top = 2.525e-6_r8 * (ParamsShareInst%Q10_mr ** ((25._r8 - 20._r8)/10._r8))
-#endif
+            if (use_humhol) then
+               lmr25top = br_mr(veg_pp%itype(p)) * q10_mr(veg_pp%itype(p)) ** ((25._r8 - 20._r8)/10._r8)
+            else
+               lmr25top = 2.525e-6_r8 * (ParamsShareInst%Q10_mr ** ((25._r8 - 20._r8)/10._r8))
+            end if
             lmr25top = lmr25top * lnc(p) / 12.e-06_r8
 
          else
@@ -2454,6 +2422,11 @@ contains
 
                vcmaxse = 668.39_r8 - 1.07_r8 * min(max((t10(p)-tfrz),11._r8),35._r8)
                jmaxse  = 659.70_r8 - 0.75_r8 * min(max((t10(p)-tfrz),11._r8),35._r8)
+               if (use_humhol .and. nint(veg_vp%nonvascular(veg_pp%itype(p))) == 1) then
+                  ! Moss-specific temperature acclimation (narrower range, lower optimum)
+                  vcmaxse = 673.39_r8 - 0.54_r8 * min(max((t10(p)-tfrz),5._r8),15._r8)
+                  jmaxse  = 664.70_r8 - 0.65_r8 * min(max((t10(p)-tfrz),5._r8),15._r8)
+               end if
                tpuse = vcmaxse
                vcmaxc = fth25 (vcmaxhd, vcmaxse)
                jmaxc  = fth25 (jmaxhd, jmaxse)

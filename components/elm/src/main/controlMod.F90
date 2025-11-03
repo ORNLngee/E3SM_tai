@@ -64,10 +64,15 @@ module controlMod
                         firrig_data, all_active, mpi_sync_nstep_freq, &
                         use_c13, use_c14, fates_paramfile, use_fates, &
                         use_betr, use_lai_streams, metdata_type, metdata_bypass, &
-                        metdata_biases, co2_file, aero_file, &
+                        metdata_biases, co2_file, aero_file, tide_file, &
                         use_elm_interface, use_elm_bgc, use_pflotran, &
+                        use_alquimia, alquimia_inputfile, alquimia_engine_name, &
+                        alquimia_IC_name, alquimia_CO2_name, alquimia_NH4_name, &
+                        alquimia_NO3_name, alquimia_handsoff, &
                         use_vsfm, vsfm_satfunc_type, vsfm_use_dynamic_linesearch, &
                         vsfm_lateral_model_type, vsfm_include_seepage_bc, &
+                        use_humhol, obs_zwt_forcing, boardwalk_shade_frac, &
+                        boardwalk_light_trans, &
                         use_hydrstress, lateral_connectivity, domain_decomp_type, &
                         use_IM2_hillslope_hydrology, use_petsc_thermal_model, &
                         do_budgets, budget_inst, budget_daily, budget_month, &
@@ -99,7 +104,8 @@ module controlMod
                         use_vichydro, use_century_decomp, use_cn, use_crop, &
                         use_snicar_frc, use_snicar_ad, use_firn_percolation_and_compaction, &
                         use_extrasnowlayers, use_T_rho_dependent_snowthk, &
-                        use_vancouver, use_mexicocity, use_noio, use_finetop_rad
+                        use_vancouver, use_mexicocity, use_noio, use_finetop_rad, &
+                        use_shrub_moss_shading
   !
   ! !PUBLIC TYPES:
   implicit none
@@ -363,6 +369,8 @@ contains
 
     namelist /elm_inparm/ use_var_soil_thick, use_lake_wat_storage
 
+    namelist /elm_inparm/ use_humhol, obs_zwt_forcing, boardwalk_shade_frac, boardwalk_light_trans
+
     namelist /elm_inparm/ &
          use_vsfm, vsfm_satfunc_type, vsfm_use_dynamic_linesearch, &
          vsfm_lateral_model_type, vsfm_include_seepage_bc
@@ -390,6 +398,8 @@ contains
 
     namelist /elm_inparm/ &
          use_top_solar_rad, use_finetop_rad
+    namelist /elm_inparm/ &
+         use_shrub_moss_shading
 
     namelist /elm_mosart/ &
          lnd_rof_coupling_nstep
@@ -805,6 +815,10 @@ contains
     call mpi_bcast (use_firn_percolation_and_compaction, 1, MPI_LOGICAL, 0, mpicom, ier)
     call mpi_bcast (use_T_rho_dependent_snowthk, 1, MPI_LOGICAL, 0, mpicom, ier)
     call mpi_bcast (use_vichydro, 1, MPI_LOGICAL, 0, mpicom, ier)
+   call mpi_bcast (use_humhol, 1, MPI_LOGICAL, 0, mpicom, ier)
+   call mpi_bcast (obs_zwt_forcing, 1, MPI_LOGICAL, 0, mpicom, ier)
+    call mpi_bcast (boardwalk_shade_frac, 1, MPI_REAL8, 0, mpicom, ier)
+    call mpi_bcast (boardwalk_light_trans, 1, MPI_REAL8, 0, mpicom, ier)
     call mpi_bcast (use_century_decomp, 1, MPI_LOGICAL, 0, mpicom, ier)
     call mpi_bcast (use_cn, 1, MPI_LOGICAL, 0, mpicom, ier)
     call mpi_bcast (use_fates, 1, MPI_LOGICAL, 0, mpicom, ier)
@@ -847,7 +861,7 @@ contains
     call mpi_bcast(all_active, 1, MPI_LOGICAL, 0, mpicom, ier)
 
     ! max number of plant functional types in naturally vegetated landunit
-    call mpi_bcast(maxpatch_pft, 1, MPI_LOGICAL, 0, mpicom, ier)
+    call mpi_bcast(maxpatch_pft, 1, MPI_INTEGER, 0, mpicom, ier)
 
     ! BGC
     call mpi_bcast (co2_type, len(co2_type), MPI_CHARACTER, 0, mpicom, ier)
@@ -1156,6 +1170,9 @@ contains
     write(iulog,*) '    use_mexicocity = ', use_mexicocity
     write(iulog,*) '    use_noio = ', use_noio
     write(iulog,*) '    use_betr = ', use_betr
+    write(iulog,*) '    use_humhol = ', use_humhol
+    write(iulog,*) '    boardwalk_shade_frac = ', boardwalk_shade_frac
+    write(iulog,*) '    boardwalk_light_trans = ', boardwalk_light_trans
     write(iulog,*) '    use_IM2_hillslope_hydrology = ', use_IM2_hillslope_hydrology
     write(iulog,*) '    use_atm_downscaling_to_topunit = ', use_atm_downscaling_to_topunit
     write(iulog,*) '    precip_downscaling_method = ', precip_downscaling_method

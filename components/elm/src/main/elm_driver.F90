@@ -291,11 +291,15 @@ contains
     if (.not.use_fates) then
        if (use_cn) then
           ! For dry-deposition need to call CLMSP so that mlaidiff is obtained
-          if ( n_drydep > 0 .and. drydep_method == DD_XLND ) then
+          if ( n_drydep > 0 .and. drydep_method == DD_XLND) then 
              call t_startf('interpMonthlyVeg')
              call interpMonthlyVeg(bounds_proc, canopystate_vars)
              call t_stopf('interpMonthlyVeg')
           endif
+       else
+          call t_startf('interpMonthlyVeg')
+          call interpMonthlyVeg(bounds_proc, canopystate_vars)
+          call t_stopf('interpMonthlyVeg')
        end if
     elseif(use_fates) then
        if(use_fates_sp) then
@@ -1335,7 +1339,7 @@ contains
        call ColWaterBalanceCheck(bounds_clump, &
             filter(nc)%num_do_smb_c, filter(nc)%do_smb_c, &
             atm2lnd_vars, glc2lnd_vars, solarabs_vars,  &
-            energyflux_vars, canopystate_vars)
+            energyflux_vars, canopystate_vars, soilhydrology_vars)
        call t_stopf('balchk')
 
        call t_startf('gridbalchk')
@@ -1359,7 +1363,7 @@ contains
 
           call ColCBalanceCheck(bounds_clump, &
                filter(nc)%num_soilc, filter(nc)%soilc, &
-               col_cs, col_cf)
+               col_cs, col_cf, soilstate_vars)
 
           call ColNBalanceCheck(bounds_clump, &
                filter(nc)%num_soilc, filter(nc)%soilc, &

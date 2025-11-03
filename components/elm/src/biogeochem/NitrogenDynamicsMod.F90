@@ -11,7 +11,7 @@
   use shr_kind_mod        , only : r8 => shr_kind_r8
   use decompMod           , only : bounds_type
   use elm_varcon          , only : dzsoi_decomp, zisoi
-  use elm_varctl          , only : use_vertsoilc, use_fan
+  use elm_varctl          , only : use_vertsoilc, use_fan, use_humhol
   use subgridAveMod       , only : p2c
   use atm2lndType         , only : atm2lnd_type
   use CNStateType         , only : cnstate_type
@@ -29,6 +29,7 @@
   use FrictionVelocityType, only : frictionvel_type
   use SoilStateType       , only : soilstate_type
   use SoilHydrologyType   , only : soilhydrology_type
+  use CanopyStateType     , only : canopystate_type
   use FanUpdateMod        , only : fan_eval
 
   !
@@ -120,7 +121,8 @@ contains
   !-----------------------------------------------------------------------
   subroutine NitrogenDeposition( bounds, &
        atm2lnd_vars, frictionvel_vars,  &
-       soilstate_vars, filter_soilc, num_soilc, dt )
+       soilstate_vars, canopystate_vars, &
+       filter_soilc, num_soilc, dt )
     !
     ! !DESCRIPTION:
     ! On the radiation time step, update the nitrogen deposition rate
@@ -135,26 +137,65 @@ contains
     type(atm2lnd_type)       , intent(in)    :: atm2lnd_vars
     type(frictionvel_type)   , intent(in)    :: frictionvel_vars
     type(soilstate_type)     , intent(in)    :: soilstate_vars
+    type(canopystate_type)   , intent(in)    :: canopystate_vars
     integer                  , intent(in)    :: filter_soilc(:) ! filter for soil columns
     integer                  , intent(in)    :: num_soilc       ! number of soil columns in filter
     real(r8),   intent(in) :: dt
     !
     ! !LOCAL VARIABLES:
-    integer :: g,c                    ! indices
+    integer :: g,c,p                    ! indices
+    real(r8) :: moss_column_lai        ! effective moss LAI for column
+    real(r8) :: moss_ndep_fraction      ! fraction of N deposition going to moss
+    real(r8) :: total_ndep_flux         ! total N deposition flux
+    real(r8), parameter :: k_intercept = 1.2_r8  ! interception coefficient
     !-----------------------------------------------------------------------
 
     associate(&
          forc_ndep     =>  atm2lnd_vars%forc_ndep_grc           , & ! Input:  [real(r8) (:)]  nitrogen deposition rate (gN/m2/s)
+         elai          =>  canopystate_vars%elai_patch         , & ! Input:  [real(r8) (:)   ]  one-sided leaf area index with burying by snow
+         ndep_to_npool =>  veg_nf%ndep_to_npool   , & ! Output: [real(r8) (:)] N deposition to plant N pool (gN/m2/s)
          ndep_to_sminn =>  col_nf%ndep_to_sminn   & ! Output: [real(r8) (:)]
-         )
+    )      
+    !-----------------------------------------------------------------------
 
       ! Loop through columns
       do c = bounds%begc, bounds%endc
          g = col_pp%gridcell(c)
-         ndep_to_sminn(c) = forc_ndep(g)
-#if (defined HUM_HOL)
-         ndep_to_sminn(c) = 0.57_r8 / (86400_r8 * 365_r8)
-#endif
+         if (use_humhol) then
+            ! Calculate moss LAI and fractional cover for this column
+            moss_column_lai = 0._r8
+            do p = col_pp%pfti(c), col_pp%pftf(c)
+               if (veg_pp%active(p) .and. nint(veg_vp%nonvascular(veg_pp%itype(p))) == 1) then
+                  moss_column_lai = moss_column_lai + elai(p) * veg_pp%wtcol(p)
+               endif
+            enddo
+            if (moss_column_lai > 0._r8) then
+              moss_ndep_fraction = 1._r8 - exp(-k_intercept * moss_column_lai)
+            else
+              moss_ndep_fraction = 0._r8
+            end if
+
+            total_ndep_flux = 0.57_r8 / (86400_r8 * 365_r8)
+            ndep_to_sminn(c) = total_ndep_flux
+
+            do p = col_pp%pfti(c), col_pp%pftf(c)
+              if (veg_pp%active(p) .and. nint(veg_vp%nonvascular(veg_pp%itype(p))) == 1) then
+                 if (moss_column_lai > 0._r8) then
+                    ndep_to_npool(p) = total_ndep_flux * moss_ndep_fraction / veg_pp%wtcol(p)
+                    ndep_to_sminn(c) = ndep_to_sminn(c) - ndep_to_npool(p) * veg_pp%wtcol(p)
+                 else
+                    ndep_to_npool(p) = 0._r8
+                 endif
+              else
+                 ndep_to_npool(p) = 0._r8
+              endif
+            enddo
+         else
+            ndep_to_sminn(c) = forc_ndep(g)
+            do p = col_pp%pfti(c), col_pp%pftf(c)
+              ndep_to_npool(p) = 0._r8
+            enddo
+         end if
       end do
 
     end associate
@@ -246,31 +287,28 @@ contains
                c = filter_soilc(fc)         
                ! B. Sulman: Loop through patches. Nfix is weighted average of value for each PFT's parameters
                t = 0.0_r8
-#if (defined HUM_HOL)
                if (col_lag_npp(c) /= spval) then
-                 !need to put npp in units of gC/m2/yr here first
-                 t = (1.8_r8 * (1._r8 - exp(-0.003_r8 * col_lag_npp(c)*(secspday*dayspyr))))/(secspday*dayspyr)
-                 nfix_to_sminn(c) = max(0._r8,t)
-#else
-               if (col_lag_npp(c) /= spval) then
-                  total_weight = 0.0_r8  ! To correct for inactive and unveg cells
-                  do p = col_pp%pfti(c), col_pp%pftf(c)
-                      ! need to put npp in units of gC/m^2/year here first
-                      ! B. Sulman: calculate Nfix value for each patch's parameters, and add to weighted average
-                      if (veg_pp%active(p) .and. (veg_pp%itype(p) .ne. noveg)) then
-                          t = t + max(0._r8,veg_pp%wtcol(p)*(Nfix_NPP_c1(veg_pp%itype(p)) * &
-                                 (1._r8 - exp(-Nfix_NPP_c2(veg_pp%itype(p)) * col_lag_npp(c)*(secspday * dayspyr))))/(secspday * dayspyr))  
-                          total_weight = total_weight + veg_pp%wtcol(p)
+                  if (use_humhol) then
+                    !need to put npp in units of gC/m2/yr here first
+                    t = (1.8_r8 * (1._r8 - exp(-0.003_r8 * col_lag_npp(c)*(secspday*dayspyr))))/(secspday*dayspyr)
+                    nfix_to_sminn(c) = max(0._r8,t)
+                  else
+                     total_weight = 0.0_r8  ! To correct for inactive and unveg cells
+                     do p = col_pp%pfti(c), col_pp%pftf(c)
+                         if (veg_pp%active(p) .and. (veg_pp%itype(p) .ne. noveg)) then
+                             t = t + max(0._r8,veg_pp%wtcol(p)*(Nfix_NPP_c1(veg_pp%itype(p)) * &
+                                    (1._r8 - exp(-Nfix_NPP_c2(veg_pp%itype(p)) * col_lag_npp(c)*(secspday * dayspyr))))/(secspday * dayspyr))
+                             total_weight = total_weight + veg_pp%wtcol(p)
+                         endif
+                      enddo
+                      if(total_weight>0) then
+                          nfix_to_sminn(c) = max(0._r8,t/total_weight)
+                      else
+                          nfix_to_sminn(c) = 0._r8
                       endif
-                   enddo
-                   if(total_weight>0) then
-                       nfix_to_sminn(c) = max(0._r8,t/total_weight)
-                   else
-                       nfix_to_sminn(c) = 0._r8
-                   endif
-#endif
+                  end if
                else
-                   nfix_to_sminn(c) = 0._r8
+                  nfix_to_sminn(c) = 0._r8
                endif
             end do
          else
@@ -468,7 +506,7 @@ contains
 
   !-----------------------------------------------------------------------
   subroutine NitrogenFert(bounds, num_soilc, filter_soilc, &
-       num_pcropp, filter_pcropp )
+       num_pcropp, filter_pcropp, num_ppercropp, filter_ppercropp )
     !
     ! !DESCRIPTION:
     ! On the radiation time step, update the nitrogen fertilizer for crops
@@ -485,6 +523,8 @@ contains
     integer                 , intent(in)    :: filter_soilc(:) ! filter for soil columns
     integer , intent(in) :: num_pcropp       ! number of prog. crop patches in filter
     integer , intent(in) :: filter_pcropp(:) ! filter for prognostic crop patches
+    integer , intent(in), optional :: num_ppercropp     ! number of prog perennial crop patches in filter
+    integer , intent(in), optional :: filter_ppercropp(:) ! filter for prognostic perennial crop patches
     !
     ! !LOCAL VARIABLES:
     integer :: c,fc,p, fp                 ! indices
@@ -517,6 +557,12 @@ contains
             p = filter_pcropp(fp)
             totalfert(p) = synthfert(p) + manure(p)
          end do
+         if (present(num_ppercropp) .and. present(filter_ppercropp)) then
+            do fp = 1, num_ppercropp
+               p = filter_ppercropp(fp)
+               totalfert(p) = synthfert(p) + manure(p)
+            end do
+         end if
       end if
  
       ! if fan_to_bgc_crop == .true., FAN fills in the fert_to_sminn and totalfert for

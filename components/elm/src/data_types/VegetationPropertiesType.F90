@@ -4,7 +4,7 @@ module VegetationPropertiesType
   use shr_kind_mod   , only : r8 => shr_kind_r8
   use elm_varpar     , only : nlevdecomp
   use elm_varpar     , only : nsoilorder
-  use elm_varctl     , only : nu_com
+  use elm_varctl     , only : nu_com, use_humhol
   use elm_varcon     , only : spval, ispval
   !
   implicit none
@@ -358,8 +358,8 @@ contains
     allocate(this%stocking(0:numpft))                            ; this%stocking(:)              =spval
     allocate(this%taper(0:numpft))                               ; this%taper(:)                 =spval
 
-    allocate( this%crit_gdd1(0:numpft))                          ; this%crit_gdd1(:)             =nan
-    allocate( this%crit_gdd2(0:numpft))                          ; this%crit_gdd2(:)             =nan
+    allocate( this%crit_gdd1(0:numpft))                          ; this%crit_gdd1(:)             =spval
+    allocate( this%crit_gdd2(0:numpft))                          ; this%crit_gdd2(:)             =spval
  
     allocate( this%sal_threshold(0:numpft))        ; this%sal_threshold(:)       =spval
     allocate( this%KM_salinity(0:numpft))          ; this%KM_salinity(:)         =spval
@@ -463,10 +463,10 @@ contains
        this%needleleaf(m)   = needleleaf(m)
        this%nfixer(m)       = nfixer(m)
 
-#if (defined HUM_HOL)
-       this%br_mr_pft(m)    = br_mr_pft(m)
-       this%q10_mr_pft(m)   = q10_mr_pft(m)
-#endif
+       if (use_humhol) then
+          this%br_mr_pft(m)    = br_mr_pft(m)
+          this%q10_mr_pft(m)   = q10_mr_pft(m)
+       end if
        this%crit_gdd1(m)    = crit_gdd1(m)
        this%crit_gdd2(m)    = crit_gdd2(m)
 
