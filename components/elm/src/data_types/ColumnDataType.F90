@@ -492,6 +492,7 @@ module ColumnDataType
     real(r8), pointer :: qflx_over_supply     (:)   => null() ! col over supplied irrigation
 
     real(r8), pointer :: qflx_lat_aqu         (:)   => null() ! Total lateral flux between hummock/hollow (mm H2O /s)
+    real(r8), pointer :: seg_qflx_lat_aqu     (:)   => null() ! Total segment lateral flux between hummock/hollow (mm H2O /s)
     real(r8), pointer :: qflx_lat_aqu_layer   (:,:) => null() ! Lateral flux between hummock/hollow by layer (mm H2O/s)
     real(r8), pointer :: qflx_surf_input      (:)   => null() ! Runoff input from Hummock (mm H2O/s)
     real(r8), pointer :: qflx_tide            (:)   => null() ! tidal flux between consecutive timesteps TAO
@@ -5463,6 +5464,7 @@ contains
     allocate(this%qflx_over_supply       (begc:endc))             ; this%qflx_over_supply     (:)   = nan
     allocate(this%qflx_irr_demand        (begc:endc))             ; this%qflx_irr_demand      (:)   = nan
     allocate(this%qflx_lat_aqu           (begc:endc))             ; this%qflx_lat_aqu         (:)   = 0._r8
+    allocate(this%seg_qflx_lat_aqu       (begc:endc-1))           ; this%seg_qflx_lat_aqu     (:)   = 0._r8  ! japg [11-19-2025] segment lateral aquifer flow 
     allocate(this%qflx_lat_aqu_layer     (begc:endc,1:nlevgrnd))  ; this%qflx_lat_aqu_layer   (:,:) = 0._r8
     allocate(this%qflx_surf_input        (begc:endc))             ; this%qflx_surf_input         (:)   = nan   
     allocate(this%qflx_tide              (begc:endc))             ; this%qflx_tide            (:)   = nan !TAO
@@ -5522,11 +5524,25 @@ contains
          avgflag='A', long_name='Lateral flow between hummock and hollow', &
          ptr_col=this%qflx_lat_aqu, c2l_scale_type='urbanf')
 
+   !japg [11-19-2025] ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+    this%seg_qflx_lat_aqu(begc:endc-1) = spval
+    call hist_addfld1d (fname='SEG_QFLX_LAT_AQU',  units='mm/s', &
+         avgflag='A', long_name='Segment lateral flow between columns', &
+         ptr_col=this%seg_qflx_lat_aqu, c2l_scale_type='urbanf')
+
+    this%qflx_surf_input(begc:endc-1) = spval
+    call hist_addfld1d (fname='QFLX_SURF_INPUT',  units='mm/s', &
+         avgflag='A', long_name='Segment lateral flow between columns', &
+         ptr_col=this%qflx_surf_input, c2l_scale_type='urbanf')
+
+   ! japg [11-20-2025] ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
+
    !SLL added 7/27/21
     this%qflx_lat_aqu_layer(begc:endc, :) = spval
     call hist_addfld2d (fname='QFLX_LAT_AQU_LAYER',  units='mm/s', type2d='levgrnd', &
          avgflag='A', long_name='Lateral flow between hummock and hollow by layer', &
-         ptr_col=this%qflx_lat_aqu_layer)
+         ptr_col=this%qflx_lat_aqu_layer)   
+
 
    !SLL added 4/15/21
    this%qflx_tide(begc:endc) = spval
@@ -5599,7 +5615,7 @@ contains
     this%qflx_lat_aqu(begc:endc) = spval
     call hist_addfld1d (fname='QLAT_AQU', units='kg/m2/s', &
          avgflag='A', long_name='Lateral flux between hummock/hollow', &
-         ptr_col=this%qflx_lat_aqu, set_lake=spval, c2l_scale_type='urbanf', default='inactive')
+         ptr_col=this%qflx_lat_aqu, set_lake=spval, c2l_scale_type='urbanf', default='inactive')   
 
     if (create_glacier_mec_landunit) then
        this%qflx_glcice(begc:endc) = spval
