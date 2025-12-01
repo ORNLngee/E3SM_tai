@@ -253,7 +253,6 @@ contains
        ! Compute time step
        
        dtime = get_step_size()
-       write(iulog,*) 'japg1 [04-28-2025] ===========================================================================================> CanopyHydrologyMod.F90/CanopyHydrology'
        
        do gg = bounds%begg,bounds%endg
           irrigated_ppg(gg) = 0

@@ -114,7 +114,6 @@ contains
     ! ------------------------------------------------------------------------
     ! Initialize run control variables, timestep
     ! ------------------------------------------------------------------------
-    write(iulog,*) 'japg1 ============================================================================================================> elm_initialized1'
 
     if ( masterproc )then
        write(iulog,*) trim(version)
@@ -129,10 +128,9 @@ contains
     call elm_varcon_init()
     call landunit_varcon_init()
     call ncd_pio_init()
-    call elm_petsc_init() ! japg [03-31-2025]   ===> this subroutine is inside this model elm_initializeMod.F90
+    call elm_petsc_init()
     call init_soil_temperature()
 
-    write(iulog,*) 'japg2 ===============================================================================================================================> elm_initialized1'
 
     if (masterproc) call control_print()
 
@@ -157,7 +155,6 @@ contains
        return
     end if
 
-    write(iulog,*) 'japg3 ===============================================================================================================================> elm_initialized1'
     ! ------------------------------------------------------------------------
     ! If specified, read the grid level connectivity
     ! ------------------------------------------------------------------------
@@ -172,7 +169,6 @@ contains
        maxEdges   = 0
     endif
 
-    write(iulog,*) 'japg4 ===============================================================================================================================> elm_initialized1'
     ! ------------------------------------------------------------------------
     ! Determine clm gridcell decomposition and processor bounds for gridcells
     ! ------------------------------------------------------------------------
@@ -198,12 +194,9 @@ contains
     ! Remaining bounds (landunits, columns, patches) will be determined 
     ! after the call to decompInit_glcp - so get_proc_bounds is called
     ! twice and the gridcell information is just filled in twice
-    
-    write(iulog,*) 'japg4.1 ===============================================================================================================================> elm_initialized1', begg, endg
-    
+
     call get_proc_bounds(begg, endg)
 
-    write(iulog,*) 'japg5 ===============================================================================================================================> elm_initialized1', begg, endg
     ! ------------------------------------------------------------------------
     ! Get grid and land fraction (set ldomain)
     ! ------------------------------------------------------------------------
@@ -231,8 +224,6 @@ contains
        endif
        call surfrd_get_topo(ldomain, flndtopo)  
     endif
-
-    write(iulog,*) 'japg6 ===============================================================================================================================> elm_initialized1'
 
     !-------------------------------------------------------------------------
     ! Topounit
@@ -285,7 +276,6 @@ contains
     ! Read surface dataset and set up subgrid weight arrays
     call surfrd_get_data(begg, endg, ldomain, fsurdat)
 
-    write(iulog,*) 'japg7 ===============================================================================================================================> elm_initialized1'
     ! ------------------------------------------------------------------------
     ! Ask Fates to evaluate its own dimensioning needs.
     ! 
@@ -324,7 +314,6 @@ contains
     if (has_topounit) then
          call surfrd_topounit_data(begg, endg, fsurdat)         
     end if
-    write(iulog,*) 'japg8 ===============================================================================================================================> elm_initialized1'
     ! Initialize the topographic unit data types
     call top_pp%Init (bounds_proc%begt_all, bounds_proc%endt_all) ! topology and physical properties
     call top_as%Init (bounds_proc%begt_all, bounds_proc%endt_all) ! atmospheric state variables (forcings)
@@ -365,29 +354,21 @@ contains
        call decompInit_gtlcp(ns, ni, nj)
     endif
     !endif
-    write(iulog,*) 'japg9 ===============================================================================================================================> elm_initialized1'
+
     ! Set filters
 
     call t_startf('init_filters')
-    write(iulog,*) 'japg9.1 ===============================================================================================================================> elm_initialized1'
     call allocFilters()
-    write(iulog,*) 'japg9.2 ===============================================================================================================================> elm_initialized1'
     call t_stopf('init_filters')
-    write(iulog,*) 'japg9.3 ===============================================================================================================================> elm_initialized1'
     
     nclumps = get_proc_clumps()
-    write(iulog,*) 'japg9.4 ===============================================================================================================================> elm_initialized1'
     !$OMP PARALLEL DO PRIVATE (nc, bounds_clump)
     do nc = 1, nclumps
-       write(iulog,*) 'japg9.5 ===============================================================================================================================> elm_initialized1'
        call get_clump_bounds(nc, bounds_clump)
-       write(iulog,*) 'japg9.6 ===============================================================================================================================> elm_initialized1', nc, bounds_clump
        call reweight_wrapup(bounds_clump, &
             ldomain%glcmask(bounds_clump%begg:bounds_clump%endg)*1._r8)
-            write(iulog,*) 'japg9.7 ===============================================================================================================================> elm_initialized1'
     end do
    
-    write(iulog,*) 'japg9.7.1 ===============================================================================================================================> elm_initialized1'
 
     !$OMP END PARALLEL DO
 
@@ -398,11 +379,8 @@ contains
     ! Set CH4 Model Parameters from namelist.
     ! Need to do before initTimeConst so that it knows whether to 
     ! look for several optional parameters on surfdata file.
-    write(iulog,*) 'japg9.7.2 ===============================================================================================================================> elm_initialized1'  
     if (use_lch4) then
-       write(iulog,*) 'japg9.8 ===============================================================================================================================> elm_initialized1'
        call CH4conrd()
-       write(iulog,*) 'japg9.9 ===============================================================================================================================> elm_initialized1'
     end if
 
     ! Deallocate surface grid dynamic memory for variables that aren't needed elsewhere.
@@ -410,20 +388,14 @@ contains
     ! end of the run for error checking.
 
     !deallocate (wt_lunit, wt_cft, wt_glc_mec)
-    write(iulog,*) 'japg9.10 ===============================================================================================================================> elm_initialized1'
     deallocate (wt_cft, wt_glc_mec)    !wt_lunit not deallocated because it is being used in CanopyHydrologyMod.F90
-    write(iulog,*) 'japg9.11 ===============================================================================================================================> elm_initialized1'
     deallocate (wt_tunit, elv_tunit, slp_tunit, asp_tunit,num_tunit_per_grd)
-    write(iulog,*) 'japg9.12 ===============================================================================================================================> elm_initialized1'
     call t_stopf('elm_init1')    
 
-    write(iulog,*) 'japg10 ===============================================================================================================================> elm_initialized1'
     ! initialize glc_topo
     ! TODO - does this belong here?
     do c = bounds_proc%begc, bounds_proc%endc
-       write(iulog,*) 'japg10.1 =========> elm_initialized1', c
        l = col_pp%landunit(c)
-       write(iulog,*) 'japg10.2 =========> elm_initialized1', l
        g = col_pp%gridcell(c)
        t = col_pp%topounit(c)
        topi = grc_pp%topi(g)
@@ -441,8 +413,6 @@ contains
           col_pp%glc_topo(c) = 0._r8
        end if
     end do
-
-    write(iulog,*) 'japg11 ===============================================================================================================================> elm_initialized1'
 
   end subroutine initialize1
 
@@ -541,9 +511,7 @@ contains
     real(r8), pointer     :: data2dptr(:,:) ! temp. pointers for slicing larger arrays
     character(len=32)     :: subname = 'initialize2' 
     !----------------------------------------------------------------------
-     write(iulog,*) 'japg1 ===============================================================================================================================> elm_initialized2'
     call t_startf('elm_init2')
-    write(iulog,*) 'japg2 ===============================================================================================================================> elm_initialized2'
 
     if (do_budgets) call WaterBudget_Reset('all')
 
@@ -1055,8 +1023,6 @@ contains
 
     call t_stopf('elm_init2')
     
-    write(iulog,*) 'japg ======================================> initialize2'  ! japg [2-26-2025]
-
   end subroutine initialize2
 
   !-----------------------------------------------------------------------
@@ -1139,8 +1105,6 @@ contains
 
     call t_stopf('elm_init3')
 
-    write(iulog,*) 'japg ======================================> initialize3'  ! japg [2-26-2025]
-
   end subroutine initialize3
 
   !-----------------------------------------------------------------------
@@ -1183,8 +1147,6 @@ contains
     call endrun(msg='ERROR elm_petsc_init: '//&
          'PETSc required but the code was not compiled using -DUSE_PETSC_LIB')
 #endif
-
-   write(iulog,*) 'japg ======================================> elm_petsc_init'  ! japg [2-26-2025]
 
   end subroutine elm_petsc_init
 

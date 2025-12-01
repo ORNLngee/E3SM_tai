@@ -11,7 +11,7 @@ module domainMod
   use shr_kind_mod, only : r8 => shr_kind_r8
   use shr_sys_mod , only : shr_sys_abort
   use spmdMod     , only : masterproc
-  use elm_varctl  , only : iulog, japglog
+  use elm_varctl  , only : iulog
 
 ! !PUBLIC TYPES:
   implicit none
@@ -103,7 +103,6 @@ contains
     integer nb,ne
 
 !------------------------------------------------------------------------------
-    !write(japglog,*) 'japg =======> domain_init '
     nb = 1
     ne = ni*nj
     if (present(nbeg)) then
@@ -202,7 +201,6 @@ end subroutine domain_init
     integer ier
 !
 !------------------------------------------------------------------------------
-    !write(japglog,*) 'japg =======> domain_clean '
     if (domain%set) then
        if (masterproc) then
           write(iulog,*) 'domain_clean: cleaning ',domain%ni,domain%nj
@@ -274,9 +272,6 @@ end subroutine domain_clean
 !
 !EOP
 !------------------------------------------------------------------------------
-  !write(japglog,*) 'japg =======> domain_check ' 
-  !write(japglog,*) 'japg =======> domain%latc ', domain%latc 
-  !write(japglog,*) 'japg =======> domain%lonc ', domain%lonc 
   
   if (masterproc) then
     write(iulog,*) '  domain_check set       = ',domain%set
