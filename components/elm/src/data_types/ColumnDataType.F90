@@ -5524,11 +5524,18 @@ contains
          avgflag='A', long_name='Lateral flow between hummock and hollow', &
          ptr_col=this%qflx_lat_aqu, c2l_scale_type='urbanf')
 
-   ![JAPG] added 11/19/2025
+   !japg [11-19-2025] ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
     this%seg_qflx_lat_aqu(begc:endc-1) = spval
     call hist_addfld1d (fname='SEG_QFLX_LAT_AQU',  units='mm/s', &
          avgflag='A', long_name='Segment lateral flow between columns', &
          ptr_col=this%seg_qflx_lat_aqu, c2l_scale_type='urbanf')
+
+    this%qflx_surf_input(begc:endc-1) = spval
+    call hist_addfld1d (fname='QFLX_SURF_INPUT',  units='mm/s', &
+         avgflag='A', long_name='Segment lateral flow between columns', &
+         ptr_col=this%qflx_surf_input, c2l_scale_type='urbanf')
+
+   ! japg [11-20-2025] ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
 
    !SLL added 7/27/21
     this%qflx_lat_aqu_layer(begc:endc, :) = spval

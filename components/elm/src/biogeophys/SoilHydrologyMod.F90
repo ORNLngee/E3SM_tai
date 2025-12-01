@@ -680,7 +680,7 @@ contains
           qflx_gross_infl_soil =>    col_wf%qflx_gross_infl_soil , & ! Output: [real(r8) (:)] gross infiltration (mm H2O/s)
           qflx_gross_evap_soil =>    col_wf%qflx_gross_evap_soil , & ! Output: [real(r8) (:)] gross evaporation (mm H2O/s)
           qflx_lat_aqu         =>    col_wf%qflx_lat_aqu         , & ! Output: [real(r8) (:,:) ] total lateral flow
-          seq_qflx_lat_aqu     =>    col_wf%seq_qflx_lat_aqu     , & ! Output: [real(r8) (:,:) ] total segement lateral flow
+          seg_qflx_lat_aqu     =>    col_wf%seg_qflx_lat_aqu     , & ! Output: [real(r8) (:,:) ] total lateral flow japg [11-20-2025]
           qflx_tide            =>    col_wf%qflx_tide            , & ! Output: [real(r8) (:,:) ]
           qflx_lat_aqu_layer   =>    col_wf%qflx_lat_aqu_layer   , & ! Output: [real(r8) (:,:) ] lateral flow for each layer
           qflx_surf_input      =>    col_wf%qflx_surf_input      , & ! Output: [real(r8) (:,:) ] Input to hollowInput to hollow from hummock surface runoff
@@ -1074,7 +1074,7 @@ contains
 
                 h2osfc_tide = max(h2osfc_tide + tide_baseline, 0.0)
                !  qflx_tide(c) = (h2osfc(c)-h2osfc_before)/dtime
-                qflx_lat_aqu(2) = qflx_lat_aqu(2) + (h2osfc_tide-h2osfc(c))/dtime
+                qflx_lat_aqu(2) = qflx_lat_aqu(2) + (h2osfc_tide-h2osfc(c))/dtime   
                 write(iulog,*), 'qflx_lat_aqu(1)', qflx_lat_aqu(1)
                 write(iulog,*), 'qflx_lat_aqu(2)', qflx_lat_aqu(2)
                 write(iulog,*), 'h2osfc(c)', h2osfc(1), h2osfc(2)                
@@ -1219,7 +1219,7 @@ contains
                write(iulog,*), 'h2osfc_tide_final:',h2osfc_tide 
                 h2osfc_tide = max(h2osfc_tide + tide_baseline, 0.0)
                !  qflx_tide(c) = (h2osfc(c)-h2osfc_before)/dtime
-                qflx_lat_aqu(3) = qflx_lat_aqu(3) + (h2osfc_tide-h2osfc(c))/dtime
+                qflx_lat_aqu(3) = qflx_lat_aqu(3) + (h2osfc_tide-h2osfc(c))/dtime                      ! japg [11-20-2025] Why did you add surface water to net lateral aquifer flow ????
                 write(iulog,*), 'qflx_lat_aqu(c)', qflx_lat_aqu(1), qflx_lat_aqu(2), qflx_lat_aqu(3)
                 write(iulog,*), 'h2osfc(c)', h2osfc(1), h2osfc(2), h2osfc(3)
                 ! If flooded water surface of one column is higher than the other, add faster flow since aquifer transfer (ka parameters) is slow
@@ -1455,7 +1455,9 @@ contains
                write(iulog,*), 'h2osfc_tide_final:',h2osfc_tide 
                 h2osfc_tide = max(h2osfc_tide + tide_baseline, 0.0)
                !  qflx_tide(c) = (h2osfc(c)-h2osfc_before)/dtime
-                qflx_lat_aqu(4) = qflx_lat_aqu(4) + (h2osfc_tide-h2osfc(c))/dtime
+
+                qflx_lat_aqu(4) = qflx_lat_aqu(4) + (h2osfc_tide-h2osfc(c))/dtime    ! japg [11-24-2025] units ?????????????????????????????????????????????????????????????????????????????????????????????????
+
                 write(iulog,*), 'qflx_lat_aqu(c)', qflx_lat_aqu(1), qflx_lat_aqu(2), qflx_lat_aqu(3)
                 write(iulog,*), 'h2osfc(c)', h2osfc(1), h2osfc(2), h2osfc(3)
                 ! If flooded water surface of one column is higher than the other, add faster flow since aquifer transfer (ka parameters) is slow
