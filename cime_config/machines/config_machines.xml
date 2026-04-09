@@ -3783,10 +3783,15 @@
     <NODENAME_REGEX>gr-fe.*.lanl.gov</NODENAME_REGEX>
 =======
   <machine MACH="pathfinder">
+<<<<<<< HEAD
     <DESC>ornl-ITSD, Pathfinder, os is Linux, Dell 7615  each with 84 cores and 754gb ram, batch system is slurm</DESC>
+=======
+    <DESC>ornl-ITSD, Pathfinder, os is Linux, 32x2 pes/node, batch system is slurm</DESC>
+>>>>>>> c760182a8e (some changes for outputs and Perl5 XML::LibXML on machine.)
     <NODENAME_REGEX>pfc*</NODENAME_REGEX>
 >>>>>>> 427e6fa237 (Add PETSC and ATS built/installed in Pathfinder machine settings.)
     <OS>LINUX</OS>
+<<<<<<< HEAD
     <COMPILERS>intel,gnu</COMPILERS>
     <MPILIBS>openmpi,impi,mvapich</MPILIBS>
     <PROJECT>climateacme</PROJECT>
@@ -3797,8 +3802,20 @@
     <BASELINE_ROOT>/lustre/scratch4/turquoise/$ENV{USER}/E3SM/input_data/ccsm_baselines/$COMPILER</BASELINE_ROOT>
     <CCSM_CPRNC>/turquoise/usr/projects/climate/SHARED_CLIMATE/software/wolf/cprnc/v0.40/cprnc</CCSM_CPRNC>
     <GMAKE_J>4</GMAKE_J>
+=======
+    <COMPILERS>gnu</COMPILERS>
+    <MPILIBS>openmpi,openmpi-amanzitpls,mpi-serial</MPILIBS>
+    <CIME_OUTPUT_ROOT>/projects/hpcl-cli185/users/$USER/cime_output_dirs</CIME_OUTPUT_ROOT>
+    <DIN_LOC_ROOT>/projects/hpcl-cli185/world-shared/e3sm/inputdata</DIN_LOC_ROOT>
+    <DIN_LOC_ROOT_CLMFORC>/projects/hpcl-cli185/world-shared/e3sm/inputdata/atm/datm7</DIN_LOC_ROOT_CLMFORC>
+    <DOUT_S_ROOT>/projects/hpcl-cli185/users/$USER/archive/e3sm/$CASE</DOUT_S_ROOT>
+    <BASELINE_ROOT>/projects/hpcl-cli185/world-shared/e3sm/baselines/$COMPILER-$MPILIB</BASELINE_ROOT>
+    <CCSM_CPRNC>/projects/hpcl-cli185/world-shared/e3sm/tools/cprnc/bin/cprnc</CCSM_CPRNC>
+    <GMAKE_J>32</GMAKE_J>
+>>>>>>> c760182a8e (some changes for outputs and Perl5 XML::LibXML on machine.)
     <TESTS>e3sm_developer</TESTS>
     <BATCH_SYSTEM>slurm</BATCH_SYSTEM>
+<<<<<<< HEAD
 <<<<<<< HEAD
     <SUPPORTED_BY>luke.vanroekel @ gmail.com</SUPPORTED_BY>
     <MAX_TASKS_PER_NODE>36</MAX_TASKS_PER_NODE>
@@ -3809,6 +3826,11 @@
     <SUPPORTED_BY>yuanf -at- ornl.gov</SUPPORTED_BY>
     <MAX_TASKS_PER_NODE>84</MAX_TASKS_PER_NODE>
     <MAX_MPITASKS_PER_NODE>84</MAX_MPITASKS_PER_NODE>
+=======
+    <SUPPORTED_BY>yuanf -at- ornl.gov</SUPPORTED_BY>
+    <MAX_TASKS_PER_NODE>64</MAX_TASKS_PER_NODE>
+    <MAX_MPITASKS_PER_NODE>64</MAX_MPITASKS_PER_NODE>
+>>>>>>> c760182a8e (some changes for outputs and Perl5 XML::LibXML on machine.)
     <PROJECT_REQUIRED>FALSE</PROJECT_REQUIRED>
     <mpirun mpilib="openmpi" compiler="gnu">
       <executable>srun</executable>
