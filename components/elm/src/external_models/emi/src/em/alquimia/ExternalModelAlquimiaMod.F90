@@ -1304,8 +1304,8 @@ end subroutine EMAlquimia_Coldstart
                 endif
                 if(this%sodium_pool_number>0) lat_bc(this%sodium_pool_number) = flood_salinity_l2e(c)/.0018066_r8*0.5769_r8/22.989_r8
                 if(this%sulfide_pool_number>0) lat_bc(this%sulfide_pool_number) = flood_salinity_l2e(c)/.0018066_r8*1e-9_r8/33.1_r8
-                ! Assuming ocean water pH is 8 at salinity of 30 and freshwater pH is 6 at salinity of zero
-                if(this%Hplus_pool_number>0) lat_bc(this%Hplus_pool_number) = 10**(-(4.5+flood_salinity_l2e(c)*2.0/30.0))
+                ! Assuming ocean water pH is 8 at salinity of 30 and freshwater pH is 6 at salinity of zero !BAM adjusted to 7 for true neutral
+                if(this%Hplus_pool_number>0) lat_bc(this%Hplus_pool_number) = 10**(-(7+flood_salinity_l2e(c)*2.0/30.0))
                 
                 if(this%NO3_pool_number>0) lat_bc(this%NO3_pool_number) = flood_nitrate_l2e(c)*1000
 
@@ -1318,7 +1318,7 @@ end subroutine EMAlquimia_Coldstart
                   endif
                   if(this%sodium_pool_number>0) surf_bc(this%sodium_pool_number) = flood_salinity_l2e(c)/.0018066_r8*0.5769_r8/22.989_r8
                   if(this%sulfide_pool_number>0) surf_bc(this%sulfide_pool_number) = flood_salinity_l2e(c)/.0018066_r8*1e-9_r8/33.1_r8
-                  if(this%Hplus_pool_number>0) surf_bc(this%Hplus_pool_number) = 10**(-(4.5+flood_salinity_l2e(c)*2.0/30.0))
+                  if(this%Hplus_pool_number>0) surf_bc(this%Hplus_pool_number) = 10**(-(6+flood_salinity_l2e(c)*2.0/30.0))
                   
                   if(this%NO3_pool_number>0) surf_bc(this%NO3_pool_number) = flood_nitrate_l2e(c)*1000
                 else
@@ -1328,7 +1328,7 @@ end subroutine EMAlquimia_Coldstart
                   endif
                   if(this%sodium_pool_number>0) surf_bc(this%sodium_pool_number) = 0.0_r8
                   if(this%sulfide_pool_number>0) surf_bc(this%sulfide_pool_number) = 0.0_r8
-                  if(this%Hplus_pool_number>0) surf_bc(this%Hplus_pool_number) = 10**(-(4.5+0.0_r8*2.0/30.0))
+                  if(this%Hplus_pool_number>0) surf_bc(this%Hplus_pool_number) = 10**(-(7+0.0_r8*2.0/30.0))
 
                 endif
 
@@ -1877,6 +1877,7 @@ end subroutine EMAlquimia_Coldstart
     ! We will store mobile concentrations as  mol/m3 bulk on ELM side and mol/L on alquimia side
     ! This is so changes in layer water content across time steps are properly reflected in concentrations
     molperL_to_molperm3 = 1000.0_r8*this%chem_state%porosity*this%chem_properties%saturation
+    molperL_to_molperm3 = max(molperL_to_molperm3, minval) !BAM: capping to avoid tiny denominators that might cause later divisions to blow up
 
     ! c_f_pointer just points an array to the right data, so it needs to be actually copied
     call c_f_pointer(this%chem_state%total_mobile%data, alquimia_data, (/this%chem_sizes%num_primary/))
@@ -2469,7 +2470,8 @@ end subroutine EMAlquimia_Coldstart
     this%chem_state%porosity =    porosity(j)
     this%chem_state%temperature = temperature(j) - 273.15
     this%chem_properties%volume = volume(j)
-    this%chem_properties%saturation = sat(j)*max(liq_frac(j),0.01) ! Set minimum saturation to stop concentrations from blowing up at low soil moisture
+    this%chem_properties%saturation = sat(j)!*max(liq_frac(j),1.0e-6_r8) ! Set minimum saturation to stop concentrations from blowing up at low soil moisture
+    this%chem_properties%saturation = min(max(this%chem_properties%saturation, 1.0e-12_r8), 1.0_r8) !BAM: adding safety control to prevent unreasonable values
     if(liq_frac(j)<0.5) this%chem_state%temperature = -100.0_r8
 
     call this%copy_ELM_to_Alquimia(j,water_density,&
@@ -2686,7 +2688,7 @@ subroutine run_vert_transport(this,actual_dt, total_mobile, free_mobile, &
 
   ! real(r8), parameter   :: minval = 1.e-35_r8
 
-  ebul_atmo_frac=0.0 ! Fraction of ebullition that goes directly to atmosphere instead of next layer up
+  ebul_atmo_frac=0.3 ! Fraction of ebullition that goes directly to atmosphere instead of next layer up
 
   do j=1,nlevdecomp
   sat(j) = min(max(saturation(j),0.01),1.0)
@@ -2724,19 +2726,21 @@ subroutine run_vert_transport(this,actual_dt, total_mobile, free_mobile, &
           gas_pressure = total_mobile(j,k)/porosity(j)/(this%Henry_const(k)*exp(-this%Henry_Tdep(k)*(1/temperature(j)-1/298.15)))
         endif
         ! Approximate ebullition by increasing diffusion coefficient when gas pressure is higher than water pressure
-        if(gas_pressure>water_pressure .and. sat(j)>0.75) then
+        ! BAM 12/2/25: editing so ebullition only approxim. when pores contain mostly liq. water (frozen ground control), adding liq_frac(j) gating to help w/CH4 release in winter
+        if(gas_pressure>water_pressure .and. sat(j)>0.6 .and. liq_frac(j)>0.7_r8) then
           diffus(j) = max(diffus(j),2.0e-5_r8*0.66_r8*porosity(j)*((gas_pressure-water_pressure)/gas_pressure)*((gas_pressure-water_pressure)/gas_pressure)**3)
         endif
         atmo_pressure = 101.325e3_r8 ! Pa
         ! Henry constant mol/(m3*Pa)
         ! gas flux over finite time step = (C_atmo - C_layer)*(1-exp(-kD/z*dt)) based on integrating diffusion equation
         ! Maybe better equation is (C_atmo - C_layer)*erf(z/(2*sqrt(D*dt)))
-        total_resist = total_resist + (diffus(j)+2.5e-9_r8*0.005_r8*exp(10.0_r8*sat(j)*liq_frac(j)*porosity(j)))*dzsoi_decomp(j)
+        total_resist = total_resist + diffus(j)*dzsoi_decomp(j)
+        ! total_resist = total_resist + (diffus(j)+2.5e-9_r8*0.005_r8*exp(10.0_r8*sat(j)*liq_frac(j)*porosity(j)))*dzsoi_decomp(j)
         ! Effective diffus is harmonic mean of 1/diffus in each layer above the current one (equals 1/ weighted harmonic mean of resistance)
         ! This could be updated to include other pathways like plant-mediated transport
         effective_diffus = total_resist/zsoi(j)
         ! Make surface equilibration slower up than down (try to fix methane emission issue)
-        if(atmo_pressure*this%atmo_mixing_ratio(k) < gas_pressure) effective_diffus = effective_diffus*0.1_r8
+        ! if(atmo_pressure*this%atmo_mixing_ratio(k) < gas_pressure) effective_diffus = effective_diffus*0.7_r8
         surf_equil_step(j,k) = (atmo_pressure*this%atmo_mixing_ratio(k) - gas_pressure)*& ! Difference in gas pressure
                                 (1.0_r8-erf(zsoi(j)/(2.0*sqrt(effective_diffus*3600_r8))))*actual_dt/3600.0_r8*&          ! Integrate effective diffusion over time
                                 (this%Henry_const(k)*exp(-this%Henry_Tdep(k)*(1/temperature(j)-1/298.15)))*& ! Convert to concentration using Henry constant
