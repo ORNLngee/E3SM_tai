@@ -4465,6 +4465,8 @@
     <EXEROOT>$CIME_OUTPUT_ROOT/$CASE/bld</EXEROOT>
     <environment_variables compiler="gnu" mpilib="openmpi">
       <env name="PETSC_PATH">/projects/hpcl-cli185/proj-shared/ccsi-apps/petsc-3.x-noopt/</env>
+      <env name="ALQUIMIA_PATH">/projects/hpcl-cli185/proj-shared/ccsi-apps/alquimia-pflotran/v2021/alquimia/</env>
+      <env name="PFLOTRAN_PATH">/projects/hpcl-cli185/proj-shared/ccsi-apps/alquimia-pflotran/v2021/pflotran/</env>
       <!--  perl5 lib</env> -->
       <!--  env name="PATH">/home/f9y/perl5/bin:$ENV{PATH}/</env> -->
       <env name="PATH">/software/baseline/nsp/spack-envs/core-25.05/opt/gcc-8.5.0.core/perl-5.40.0-pwv5237oq3rfrgdyou22rp4sf3dywvuz/bin:$ENV{PATH}</env>
