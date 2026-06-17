@@ -179,12 +179,14 @@ contains
     character(*), parameter :: subName = '(shr_pio_init2) '
 
     ! 0 is a valid value of pio_buffer_size_limit
+#ifdef PIO2
     if(pio_buffer_size_limit>=0) then
        if(comp_comm_iam(1)==0) then
           write(shr_log_unit,*) 'Setting pio_buffer_size_limit : ',pio_buffer_size_limit
        end if
        call pio_set_buffer_size_limit(pio_buffer_size_limit)
     endif
+#endif
     if(pio_blocksize>0) then
        if(comp_comm_iam(1)==0) then
           write(shr_log_unit,*) 'Setting pio_blocksize : ',pio_blocksize
