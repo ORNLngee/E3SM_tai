@@ -923,39 +923,9 @@ contains
 
                ! if the gdd flag is set, and if the soil is above freezing
                ! then accumulate growing degree days for onset trigger
-
-
-               !if (onset_gddflag(p) == 1.0_r8 .and. soilt > SHR_CONST_TKFRZ) then
-               !   onset_gdd(p) = onset_gdd(p) + (soilt-SHR_CONST_TKFRZ)*fracday
-#ifdef HUM_HOL
-               if (ivt(p)==3) then!DN (3)
-                 !forcing
-                 if (onset_gddflag(p) == 1.0_r8 .and. t_ref2m(p) > 279.50_r8 .and. ws_flag == 1._r8) then
-                   onset_gdd(p) = onset_gdd(p)+(t_ref2m(p)-279.50_r8)*fracday
-                 end if
-                 !then accumulate chilling days for onset trigger
-                 if (onset_gddflag(p) == 1.0_r8 .and. t_ref2m(p) < 279.50_r8 .and. ws_flag == 1._r8) then
-                   onset_chil(p) = onset_chil(p) + fracday
-                 end if
-                 crit_onset_gdd = 9._r8 +2112._r8 * exp(-0.04_r8 * onset_chil(p))
-               else if (ivt(p)==11) then !SH (11)
-                 if (onset_gddflag(p) == 1.0_r8 .and. t_ref2m(p) > 279.05_r8 .and. ws_flag == 1._r8) then
-                   onset_gdd(p) = onset_gdd(p) +(t_ref2m(p)-279.05_r8)*fracday
-                 end if
-                 if (onset_gddflag(p) == 1.0_r8 .and. t_ref2m(p) < 279.05_r8 .and. ws_flag == 1._r8) then
-                   onset_chil(p) = onset_chil(p) + fracday
-                 end if
-                 crit_onset_gdd = 33._r8 + 1388._r8 * exp(-0.02_r8 * onset_chil(p))
-               else
-                 if (onset_gddflag(p) == 1.0_r8 .and. soilt > SHR_CONST_TKFRZ) then
-                   onset_gdd(p) = onset_gdd(p) + (soilt-SHR_CONST_TKFRZ)*fracday
-                 end if
-               end if
-#else
                if (onset_gddflag(p) == 1.0_r8 .and. soilt > SHR_CONST_TKFRZ) then
                   onset_gdd(p) = onset_gdd(p) + (soilt-SHR_CONST_TKFRZ)*fracday
                end if
-#endif
 
                ! set onset_flag if critical growing degree-day sum is exceeded
                if (onset_gdd(p) > crit_onset_gdd) then
@@ -1008,46 +978,12 @@ contains
             else if (offset_flag(p) == 0.0_r8) then
                ! only begin to test for offset daylength once past the summer sol
 
-#ifdef HUM_HOL
-              if (ivt(p) == 3) then
-                if(ws_flag == 0._r8 .and. dayl(g) < 46800.0_r8 .and. t_ref2m(p) < 294.5_r8) then
-                  dayl_temp(p) =dayl_temp(p) + ((294.5_r8 - t_ref2m(p))**2 * (dayl(g)/46800.0_r8 )) * fracday
-                end if
-
-                if(ws_flag == 0._r8 .and. dayl_temp(p)> 1750.0_r8) then
-                  offset_flag(p) = 1._r8
-                  dayl_temp(p) = 0._r8
-                  offset_counter(p) = PhenolParamsInst%ndays_off * secspday
-                  prev_leafc_to_litter(p) = 0._r8
-                  prev_frootc_to_litter(p) = 0._r8
-                end if
-              else if (ivt(p) == 11) then
-                if(ws_flag == 0._r8 .and. dayl(g) < 54600.0_r8 .and. t_ref2m(p) < 290.15_r8) then
-                  dayl_temp(p) =dayl_temp(p) +( (290.15_r8 - t_ref2m(p))**2 *(dayl(g)/54600.0_r8))*fracday
-                end if
-                if(ws_flag == 0._r8 .and. dayl_temp(p)> 1600.0_r8) then
-                  offset_flag(p) = 1._r8
-                  dayl_temp(p) = 0._r8
-                  offset_counter(p) = PhenolParamsInst%ndays_off * secspday
-                  prev_leafc_to_litter(p) = 0._r8
-                  prev_frootc_to_litter(p) = 0._r8
-                end if
-              else
-                if (ws_flag == 0._r8 .and. dayl(g) < PhenolParamsInst%crit_dayl) then
-                  offset_flag(p) = 1._r8
-                  offset_counter(p) = PhenolParamsInst%ndays_off * secspday
-                  prev_leafc_to_litter(p) = 0._r8
-                  prev_frootc_to_litter(p) = 0._r8
-                 end if
-              end if
-#else
                if (ws_flag == 0._r8 .and. dayl(g) < PhenolParamsInst%crit_dayl) then
                   offset_flag(p) = 1._r8
                   offset_counter(p) = PhenolParamsInst%ndays_off * secspday
                   prev_leafc_to_litter(p) = 0._r8
                   prev_frootc_to_litter(p) = 0._r8
                end if
-#endif
             end if
             !make sure a second onset period doesn't occur SL 02-09-22
             if (ws_flag == 0._r8 .and. dayl(g) < PhenolParamsInst%crit_dayl) then

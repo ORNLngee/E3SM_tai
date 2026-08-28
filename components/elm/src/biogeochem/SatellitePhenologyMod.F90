@@ -314,12 +314,7 @@ contains
     use clm_time_manager, only : get_curr_date, get_step_size, get_nstep
     use elm_varcon      , only : secspday
     use pftvarcon,  only : noveg, nbrdlf_dcd_brl_shrub, season_decid, stress_decid
-#if defined HUM_HOL
-    use pftvarcon, only : phen_a, phen_b, phen_c, phen_topt, phen_fstar, phen_tc
-    use pftvarcon, only : phen_cstar, phen_tforce, phen_tchil, phen_pstart, phen_tb, phen_ycrit 
-#endif
     use elm_varctl, only : use_fates_sp
-    use pftvarcon, only : phen_spring, phen_autumn, phen_tbase, phen_crit_dayl
     !----------------------F.-M. Yuan: 2018-03-23---------------------------------------------------------------------
     use pftvarcon, only : nshrub
     !----------------------F.-M. Yuan: 2018-03-23---------------------------------------------------------------------
@@ -418,131 +413,6 @@ contains
             else
               ws_flag = 0._r8
             end if
-            !------ Seasonal deciduous phenology ----------------------
-#if defined HUM_HOL
-            !crit_onset_gdd = exp(4.8_r8 + 0.13_r8*(tmean(p) - SHR_CONST_TKFRZ))
-            crit_onset_gdd = phen_fstar
-            if (.not. use_cn .and. season_decid(ivt(p)) == 1._r8) then
-               tlai(p) = maxval(annlai(:,p))
-               crit_dayl = phen_crit_dayl !39300_r8
-               !Spring phenology
-               !Increment GDD and chilling days, check threshold according to model formulation
-               spring_threshold = 0 
-               if (ws_flag == 1._r8 .and. phen_spring == 0) then 
-                 !Default model
-                 sp_gdd(p) = sp_gdd(p) + max((t_soisno(c,3) - SHR_CONST_TKFRZ)*fracday, 0._r8)
-                 if (sp_gdd(p) .ge. crit_onset_gdd) spring_threshold = 1
-               else if (ws_flag == 1._r8 .and. phen_spring == 1) then 
-                 !PAR model
-                 if (t_ref2m(p) > phen_tbase) sp_gdd(p) = sp_gdd(p) + &
-                   (28.4_r8 / (1._r8 + exp(3.4_r8 - (t_ref2m(p) -SHR_CONST_TKFRZ)*0.185_r8)))*fracday 
-                 if (t_ref2m(p) > phen_topt .and. t_ref2m(p) < (phen_topt + 10.4_r8)) then 
-                   sp_chil(p) = sp_chil(p) + (((t_ref2m(p) - SHR_CONST_TKFRZ)-10.4_r8)/(phen_topt-10.4_r8))*fracday 
-                 end if
-                 if (t_ref2m(p) > phen_topt-3.4_r8 .and. t_ref2m(p) <= phen_topt) then
-                   sp_chil(p) = sp_chil(p) + (((t_ref2m(p) - SHR_CONST_TKFRZ)+3.4_r8)/(phen_topt+3.4_r8))*fracday
-                 end if
-                 if (sp_gdd(p) > phen_a + phen_b * exp(sp_chil(p))) spring_threshold = 1 
-               else if (ws_flag == 1._r8 .and. phen_spring == 2) then
-                 !ALT model
-                 if (t_ref2m(p) > phen_tbase) sp_gdd(p) = sp_gdd(p) + (t_ref2m(p)-phen_tbase)*fracday
-                 if (t_ref2m(p) > 263.0_r8 .and. t_ref2m(p) < phen_tbase) sp_chil(p) = sp_chil(p) + fracday
-                 if (sp_gdd(p) > phen_a + phen_b * exp(phen_c * sp_chil(p))) spring_threshold = 1
-               else if (ws_flag == 1._r8 .and. phen_spring == 3) then 
-                 !SEQ model
-                 if (t_ref2m(p) < phen_tchil .and. t_ref2m(p) > 263._r8) sp_chil(p)=sp_chil(p)+fracday
-                 if (sp_chil(p) > phen_cstar .and. t_ref2m(p) > phen_tforce) then 
-                   sp_gdd(p) = sp_gdd(p) + (t_ref2m(p)-phen_tforce)*fracday
-                 end if
-                 if (sp_gdd(p) > phen_fstar) spring_threshold = 1
-               else if (ws_flag == 1._r8 .and. phen_spring == 4) then
-                 !SW model
-                 sp_gdd(p) = sp_gdd(p) + (28.4_r8 / (1.0_r8 + exp(3.4_r8-(t_ref2m(p)-SHR_CONST_TKFRZ)*0.185_r8)))*fracday
-                 if (sp_gdd(p) .ge. phen_fstar) spring_threshold = 1
-               end if
-               !Increment dayl_temp (DM only)
-               if (tlai(p) > 0._r8 .and. dayl(g) < phen_pstart .and. t_ref2m(p) < phen_tb) then 
-                 sp_dayl_temp(p) = sp_dayl_temp(p) + (phen_tb - t_ref2m(p))**2 * (1.0_r8 -dayl(g)/phen_pstart)**2
-               end if
-             
-               if (ws_flag == 1._r8) then   !Onset period
-                 !Set offset counters to zero
-                 sp_offset_day(p) = 0._r8
-                 sp_dayl_temp(p)  = 0._r8
-                 if (spring_threshold == 1) then  
-                   sp_onset_day(p) = min(sp_onset_day(p)+fracday, ndays_on)
-                   tlai(p) = tlai(p) * sp_onset_day(p) / ndays_on
-                 else
-                   tlai(p) = 0._r8
-                 end if
-               else                         !Offset period
-                 !set onset counters to zero
-                 sp_chil(p)       = 0._r8
-                 sp_onset_day(p)  = 0._r8
-                 sp_gdd(p)        = 0._r8
-                 autumn_threshold = 0
-                 !default senescence model
-                 if (phen_autumn == 0 .and. dayl(g) .lt. crit_dayl) autumn_threshold = 1
-                 !WM
-                 if (phen_autumn == 1 .and. ((dayl(g) .lt. crit_dayl .and. t_soisno(c,3) < phen_tb) .or. &
-                       t_soisno(c,3) < phen_tc)) then
-                   autumn_threshold = 1
-                 end if
-                 !DM
-                 if (phen_autumn == 2 .and. sp_dayl_temp(p) > phen_ycrit) autumn_threshold = 1
-                 if (autumn_threshold == 1) then 
-                   sp_offset_day(p) = sp_offset_day(p)+fracday
-                 end if
-                 tlai(p) = max(tlai(p) * (ndays_off - sp_offset_day(p)) / ndays_off, 0._r8)
-               end if
-            end if
- 
-            !-------------Stress deciduous phenology ------------------------
-            if (.not. use_cn .and. stress_decid(ivt(p)) == 1._r8) then
-              tlai(p) = 2.0_r8 !maxval(annlai(:,p))
-              crit_dayl = 36000._r8
-              if (dayl(g) .ge. crit_dayl) then
-                sp_gdd(p) = sp_gdd(p) + max((t_soisno(c,3) - SHR_CONST_TKFRZ)*fracday, 0._r8)
-                if (soilpsi(c,3) .ge. soilpsi_on)  sp_swi_on(p)  = sp_swi_on(p) + fracday
-              end if
-              !Stress offset day counters (only allow positive values)
-              if (soilpsi(c,3) .lt. soilpsi_off) sp_swi_off(p) = sp_swi_off(p) + fracday               
-              if (soilpsi(c,3) .ge. soilpsi_off .and. sp_swi_off(p) .lt. crit_offset_swi) sp_swi_off(p) = max(sp_swi_off(p) - fracday, 0._r8)
-              !Adjust LAI (short term leaf mortality for dryness)
-              !tlai(p) = tlai(p) * max((1.0_r8 - 0.5_r8 * sp_swi_off(p) / crit_offset_swi), 0.5_r8)
-
-              if (t_soisno(c,3) .lt. SHR_CONST_TKFRZ) sp_fdd_off(p) = sp_fdd_off(p) + fracday
-              if (t_soisno(c,3) .ge. SHR_CONST_TKFRZ .and. sp_fdd_off(p) .lt. crit_offset_fdd) sp_fdd_off(p) = max(sp_fdd_off(p) - fracday, 0._r8)
- 
-              !Onset/full LAI period
-              if (sp_gdd(p) .ge. crit_onset_gdd .and. dayl(g) .ge. crit_dayl .and. sp_swi_on(p) .ge. &
-                crit_onset_swi .and. sp_swi_off(p) .lt. crit_offset_swi) then
-                  sp_onset_day(p) = min(sp_onset_day(p)+fracday, ndays_on)
-                tlai(p) = tlai(p) * sp_onset_day(p) / ndays_on
-                if (sp_onset_day(p) .lt. ndays_on) then 
-                  sp_swi_off(p) = 0._r8   !Force offset counters to zero during onset period
-                  sp_fdd_off(p) = 0._r8
-                end if
-              !Offset period
-              else if (sp_gdd(p) .ge. crit_onset_gdd .and. sp_swi_on(p) .ge. crit_onset_swi .and. &
-                     (dayl(g) .lt. crit_dayl .or. sp_swi_off(p) .ge. crit_offset_swi .or. &
-                     sp_fdd_off(p) .ge. crit_offset_fdd)) then 
-                sp_offset_day(p) = sp_offset_day(p)+fracday
-                tlai(p) = tlai(p) * (ndays_off - sp_offset_day(p)) / ndays_off
-              else
-                tlai(p) = 0._r8
-              end if
-              !reset all counters when full senescence occurs
-              if (sp_offset_day(p) .gt. ndays_off) then
-                sp_offset_day(p) = 0._r8
-                sp_onset_day(p)  = 0._r8
-                sp_gdd(p)        = 0._r8
-                sp_swi_on(p)     = 0._r8
-                sp_swi_off(p)    = 0._r8
-                sp_fdd_off(p)    = 0._r8
-              end if
-           endif
-#endif
          endif
 
          tsai(p) = timwt(1)*msai2t(p,1) + timwt(2)*msai2t(p,2)

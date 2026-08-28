@@ -41,9 +41,6 @@ contains
     use pftvarcon        , only : noveg, nc3crop, nc3irrig, nbrdlf_evr_shrub, nbrdlf_dcd_brl_shrub
     use pftvarcon        , only : ncorn, ncornirrig, npcropmin, ztopmx, laimx
     use pftvarcon        , only : nmiscanthus, nmiscanthusirrig, nswitchgrass, nswitchgrassirrig
-#if (defined HUM_HOL)
-    use pftvarcon        , only : humhol_ht
-#endif
     !----------------------F.-M. Yuan: 2018-03-23---------------------------------------------------------------------
     use pftvarcon        , only : ntree, nshrub
     !----------------------F.-M. Yuan: 2018-03-23---------------------------------------------------------------------
@@ -279,21 +276,8 @@ contains
             ol = min( max(snow_depth(c)-hbot(p), 0._r8), htop(p)-hbot(p))
             fb = 1._r8 - ol / max(1.e-06_r8, htop(p)-hbot(p))
          else
-#if (defined HUM_HOL)
-           if (ivt(p) == 12) then
-             thiswtht = zwt(c)*(-1.0_r8)+humhol_ht/2.0_r8+h2osfc(c)/1000._r8 !height above hollow bottom
-             !calculate submerged LAI
-             !Calculate LAI buried by snow (5cm is assumed)
-             fb1 = 1._r8 - max(min(snow_depth(c),0.05_r8),0._r8)/0.05_r8
-             fb2 = 1._r8 - max(min(thiswtht,0.2_r8),0._r8)/0.2_r8 
-             fb = min(fb1, fb2)
-           else
-             fb = 1._r8 - max(min(snow_depth(c),0.2_r8),0._r8)/0.2_r8 ! 0.2m is assumed
-           end if
-#else
            !depth of snow required for complete burial of grasses
            fb = 1._r8 - max(min(snow_depth(c),0.2_r8),0._r8)/0.2_r8   !0.2m is assumed
-#endif
          endif
 
          elai(p) = max(tlai(p)*fb, 0.0_r8)

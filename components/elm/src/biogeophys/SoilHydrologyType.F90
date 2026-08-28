@@ -248,7 +248,6 @@ contains
     use fileutils       , only : getfil
     use organicFileMod  , only : organicrd
     use ncdio_pio       , only : file_desc_t, ncd_io, ncd_pio_openfile, ncd_pio_closefile
-    use pftvarcon       , only : humhol_ht, humhol_dist
     !
     ! !ARGUMENTS:
     class(soilhydrology_type) :: this
@@ -886,11 +885,7 @@ contains
      namelist / elm_soilhydrology_inparm / h2osfcflag, origflag
 
 
-#if (defined HUM_HOL)
-     origflag = 1    
-#else
      origflag = 0
-#endif      
      h2osfcflag = 1        
 
      if ( masterproc )then

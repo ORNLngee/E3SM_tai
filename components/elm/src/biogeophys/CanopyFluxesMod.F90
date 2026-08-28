@@ -858,29 +858,6 @@ contains
             eah(p) = forc_pbot(t) * qaf(p) / 0.622_r8   ! pa
             rhaf(p) = eah(p)/svpts(p)
 
-            ! XShi 11/20/15 - Calculate the internal water (tissue water
-            ! content) content
-            ! for moss
-#if (defined HUM_HOL)
-            if (veg_pp%itype(p) == 12) then
-                !DMRicciuto 12/4/2015 - changed to use average of layer 3 and 4 
-                h2o_moss_inter(p) = -18032 * ((h2osoi_vol(c,3)+h2osoi_vol(c,4))/2._r8)**4 +  &
-                                7248.1 * ((h2osoi_vol(c,3)+h2osoi_vol(c,4))/2._r8)**3 -  &
-                                591.74 * ((h2osoi_vol(c,3)+h2osoi_vol(c,4))/2._r8)**2 +  &
-                                6.9031 * ((h2osoi_vol(c,3)+h2osoi_vol(c,4))/2._r8)       &
-                                + 0.4945
-                if ((h2osoi_vol(c,3) + h2osoi_vol(c,4))/2._r8 .gt. 0.25) then
-                    h2o_moss_inter(p) = -18032 *0.25**4 + 7248.1 * 0.25**3 &
-                                     -591.74 *0.25**2 + 6.9031*0.25 + 0.4954
-                endif
-                if (elai(p) .gt. 0._r8) then 
-                   h2o_moss_wc(p) = h2o_moss_inter(p) + h2ocan(p)/(elai(p)/slatop(veg_pp%itype(p)) &
-                             * 2.0_r8 / 1000.0_r8)
-                else
-                   h2o_moss_wc(p) = 0._r8
-                endif
-            end if
-#endif
          end do
 
          ! Modification for shrubs proposed by X.D.Z

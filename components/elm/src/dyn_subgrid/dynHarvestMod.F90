@@ -381,17 +381,7 @@ contains
             do varnum = 1, num_harvest_vars
                am = am + harvest_rates(varnum,g)
             end do
-#if (defined HUM_HOL)
-           call get_curr_date(yr, mon, day, sec)
-           dtime  = get_step_size()
-           if (mon == 1 .and. day == 31 .and. sec == 0) then
-             m = am/dtime   !Do site-level harvest on first day of year
-           else
-             m = 0._r8
-           end if
-#else
             m  = am/(days_per_year * secspday)
-#endif
          else
             m = 0._r8
          end if   
