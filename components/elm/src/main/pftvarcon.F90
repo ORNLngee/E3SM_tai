@@ -690,8 +690,6 @@ contains
     allocate( needleleaf         (0:mxpft) )
     allocate( nonvascular        (0:mxpft) )
     allocate( nfixer             (0:mxpft) )
-
-    ! salinity parameters -should this be an "if defined MARSH"? -SLL
     
     ! salinity parameters
     allocate( sal_threshold (0:mxpft) )
@@ -1091,53 +1089,6 @@ contains
     if ( .not. readv) hum_frac = 0.5_r8
     call ncd_io('qflx_h2osfc_surfrate', qflx_h2osfc_surfrate, 'read', ncid, readvar=readv, posNOTonfile=.true.)
     if ( .not. readv) qflx_h2osfc_surfrate = 1.0e-7_r8
-
-#ifdef MARSH
-! Tidal cycle parameters
-    ! Defaults from Teri's hard coded numbers
-    ! Multiple parameters specified in params file like tide_coeff_amp_1, tide_coeff_amp_2, ...
-    call ncd_io('tide_baseline',tide_baseline, 'read', ncid, readvar=readv, posNOTonfile=.true.)
-    if (.not. readv) tide_baseline = 0.0_r8
-    do i=1,max_tide_coeffs
-      write(tempname,'(I0)') i
-      call ncd_io('tide_coeff_amp_'//trim(tempname),tide_coeff_amp(i), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-      if (.not. readv) then
-         ! write(iulog,*) "Stopped looking for tidal components after not finding ",'tide_coeff_amp_'//trim(tempname)
-         num_tide_comps=i-1
-         exit
-      else
-         num_tide_comps=i
-      endif
-      call ncd_io('tide_coeff_period_'//trim(tempname),tide_coeff_period(i), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-      if (.not. readv) call endrun(msg="Error: Must specify amp, period, and phase for each tide component: i = "//trim(tempname))
-      call ncd_io('tide_coeff_phase_'//trim(tempname),tide_coeff_phase(i), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-      if (.not. readv) call endrun(msg="Error: Must specify amp, period, and phase for each tide component: i = "//trim(tempname))
-   enddo
-   if(num_tide_comps == 0) then
-      ! write(iulog,*) "No tidal coefficients found in parameter file. Using Teri's 2-component fit values for GCREW site as default"
-      num_tide_comps = 1
-      tide_coeff_amp(1) = 0.0_r8
-      tide_coeff_period(1) = 1.0/0.00003
-      tide_coeff_phase(1) = 0.0
-   endif
-   call ncd_io('sfcflow_ratescale',sfcflow_ratescale, 'read', ncid, readvar=readv, posNOTonfile=.true.)
-   if (.not. readv) sfcflow_ratescale = 7.0e-5_r8 ! Probably better to have default be zero for safety
-
-   ! salinity parameters
-   call ncd_io('sal_threshold', sal_threshold(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-   if ( .not. readv ) sal_threshold(:) = 50.0_r8 !placeholder value for now-update with more accurate -SLL
-   call ncd_io('sal_opt', sal_opt(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-   if ( .not. readv ) sal_opt(:) = 0.0_r8 
-   call ncd_io('sal_tol', sal_tol(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-   if ( .not. readv ) sal_tol(:) = 50.0_r8 
-
-   call ncd_io('waterlevel_threshold', waterlevel_threshold(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-   if ( .not. readv ) waterlevel_threshold(:) = 5000000.0_r8 ! Default turned off with very deep surface water
-   call ncd_io('waterlevel_opt', waterlevel_opt(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-   if ( .not. readv ) waterlevel_opt(:) = 0.0_r8 
-   call ncd_io('waterlevel_tol', waterlevel_tol(0:npft-1), 'read', ncid, readvar=readv, posNOTonfile=.true.)
-   if ( .not. readv ) waterlevel_tol(:) = 50.0_r8 
-#endif
 
     call ncd_io('phen_a', phen_a, 'read', ncid, readvar=readv, posNOTonfile=.true.)
 !    if ( .not. readv) call endrun(msg='ERROR:  error in reading in pft data'//errMsg(__FILE__,__LINE__))

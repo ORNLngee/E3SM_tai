@@ -553,26 +553,6 @@ contains
        fdrain(:) = 2.5_r8
     end if
 
-#ifdef MARSH
-
-   if (masterproc) then
-      write(iulog,*) 'Attempting to read water boundary condition data .....'
-   end if
-
-   call ncd_io(ncid=ncid, varname='ht_above_stream', flag='read', data=this%ht_above_stream, dim1name=grlnd, readvar=readvar)
-   if (.not. readvar) then
-      if(masterproc) write(iulog,*),'Did not find ht_above_stream in surface data'
-      this%ht_above_stream(:) = humhol_ht
-   end if
-
-   call ncd_io(ncid=ncid, varname='dist_from_stream', flag='read', data=this%dist_from_stream, dim1name=grlnd, readvar=readvar)
-   if (.not. readvar) then
-      if(masterproc) write(iulog,*),'Did not find dist_from_stream in surface data'
-      this%dist_from_stream(:) = humhol_dist
-   end if
-
-#endif
-
     call ncd_pio_closefile(ncid)
 
     associate(micro_sigma => col_pp%micro_sigma)
@@ -596,10 +576,6 @@ contains
             this%h2osfc_thresh_col(c) = 0._r8     !changed from 0 to 1 TAO 29/8/2018
          endif
 
-#if (defined MARSH)
-            this%h2osfc_thresh_col(c) = 2.e3_r8    ! set to zero for no h2osfc (w/frac_infclust =large) changed from 0 to 1 TAO 29/8/2018
-#endif
-
          if (this%h2osfcflag == 0) then
             this%h2osfc_thresh_col(c) = 0._r8    ! set to zero for no h2osfc (w/frac_infclust =large)
          endif
@@ -611,12 +587,6 @@ contains
          else
             this%hkdepth_col(c) = 1._r8/2.5_r8
          endif
-
-#if (defined MARSH)
-      ! Is this supposed to be set with fdrain?
-      g = col_pp%gridcell(c)
-      this%hkdepth_col(c) = 1._r8/fdrain(g)
-#endif
 
       end do
     end associate
@@ -916,7 +886,7 @@ contains
      namelist / elm_soilhydrology_inparm / h2osfcflag, origflag
 
 
-#if (defined HUM_HOL | defined MARSH)
+#if (defined HUM_HOL)
      origflag = 1    
 #else
      origflag = 0
