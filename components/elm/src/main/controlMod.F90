@@ -121,6 +121,8 @@ contains
     use elm_interface_pflotranMod , only : elm_pf_readnl
     use ELMBeTRNLMod              , only : betr_readNL
     
+    use elm_varctl                , only : elm_ctl_set_nls
+
     implicit none
     
     ! !LOCAL VARIABLES:
@@ -130,6 +132,11 @@ contains
     integer :: unitn                ! unit for namelist file
     integer :: dtime                ! Integer time-step
     integer :: override_nsrest      ! If want to override the startup type sent from driver
+
+    character(len=256):: errline
+    character(len=15) :: nu_com = 'RD'               ! note this is local only, don't mess up with that in 'elm_varctl'
+    logical           :: use_dynroot = .false.       ! note this is local only, don't mess up with that in 'elm_varctl'
+
     character(len=32) :: subname = 'control_init'  ! subroutine name
     !------------------------------------------------------------------------
 
@@ -284,6 +291,10 @@ contains
     ! bgc & pflotran interface
     namelist /elm_inparm/ use_elm_interface, use_elm_bgc, use_pflotran
 
+    namelist /elm_inparm/ use_alquimia, alquimia_inputfile, alquimia_engine_name,&
+        alquimia_IC_name, alquimia_CO2_name, alquimia_NH4_name, &
+        alquimia_NO3_name, alquimia_handsoff
+
     namelist /elm_inparm/ use_dynroot
 
     namelist /elm_inparm/ use_var_soil_thick, use_lake_wat_storage
@@ -358,6 +369,11 @@ contains
        if (ierr == 0) then
           read(unitn, elm_inparm, iostat=ierr)
           if (ierr /= 0) then
+             ! get the error line of namelist
+             backspace(unitn)
+             read(unitn,fmt='(A)') errline
+             print *, 'Invalid line: ', trim(errline), ' in namelist file: ', trim(NLFilename)
+
              call endrun(msg='ERROR reading elm_inparm namelist'//errMsg(__FILE__, __LINE__))
           end if
        end if
@@ -535,6 +551,11 @@ contains
           endif
        endif
 
+       ! a temporary solution for namelist reading issues with Mac clang based gfortran compiler
+       ! (TODO) need to check elm_varctl:nu_com after control_spmd() calling below
+       call elm_ctl_set_nls(nu_com_in            = nu_com,                 &
+                            use_dynroot_in       = use_dynroot)
+
     endif   ! end of if-masterproc if-block
 
     ! ----------------------------------------------------------------------
@@ -644,6 +665,11 @@ contains
                'lateral_connectivity to be true.'                                     // &
                errMsg(__FILE__, __LINE__))
        endif
+    endif
+
+    if (use_pflotran .and. use_alquimia) then
+        call endrun(msg=" ERROR: Cannot run with both run_alquimia and run_pflotran " // &
+                        errMsg(__FILE__, __LINE__))
     endif
 
     if (masterproc) then
@@ -889,6 +915,17 @@ contains
     call mpi_bcast (use_elm_interface, 1, MPI_LOGICAL, 0, mpicom, ier)
     call mpi_bcast (use_elm_bgc, 1, MPI_LOGICAL, 0, mpicom, ier)
     call mpi_bcast (use_pflotran, 1, MPI_LOGICAL, 0, mpicom, ier)
+    
+    ! alquimia interface controls
+    call mpi_bcast (use_alquimia, 1, MPI_LOGICAL, 0, mpicom, ier)
+    call mpi_bcast (alquimia_handsoff, 1, MPI_LOGICAL, 0, mpicom, ier)
+    call mpi_bcast (alquimia_inputfile , len(alquimia_inputfile) , MPI_CHARACTER, 0, mpicom, ier)
+    call mpi_bcast (alquimia_engine_name , len(alquimia_engine_name) , MPI_CHARACTER, 0, mpicom, ier)
+    call mpi_bcast (alquimia_IC_name , len(alquimia_IC_name) , MPI_CHARACTER, 0, mpicom, ier)
+    call mpi_bcast (alquimia_CO2_name , len(alquimia_CO2_name) , MPI_CHARACTER, 0, mpicom, ier)
+    call mpi_bcast (alquimia_NO3_name , len(alquimia_NO3_name) , MPI_CHARACTER, 0, mpicom, ier)
+    call mpi_bcast (alquimia_NH4_name , len(alquimia_NH4_name) , MPI_CHARACTER, 0, mpicom, ier)
+
 
     !cpl_bypass
      call mpi_bcast (metdata_type,   len(metdata_type),   MPI_CHARACTER, 0, mpicom, ier)

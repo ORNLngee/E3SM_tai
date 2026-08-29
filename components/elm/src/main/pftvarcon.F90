@@ -303,6 +303,15 @@ module pftvarcon
   real(r8), allocatable :: gcbr_p(:)           !effectiveness of roots in reducing rainfall-driven erosion
   real(r8), allocatable :: gcbr_q(:)           !effectiveness of roots in reducing runoff-driven erosion
 
+  ! parameters for salinity response function
+  real(r8), allocatable :: sal_threshold(:)    !threshold for salinity effects (ppt)
+  real(r8), allocatable :: sal_opt(:)          !Salinity at which optimal biomass occurs (ppt)
+  real(r8), allocatable :: sal_tol(:)          !Salinity tolerance; width parameter for Gaussian distribution (ppt -1)
+
+  real(r8), allocatable :: waterlevel_threshold(:)  !threshold for water level effects (mm above surface)
+  real(r8), allocatable :: waterlevel_opt(:)   !Water level at which optimal biomass occurs (mm)
+  real(r8), allocatable :: waterlevel_tol(:)   !Water level tolerance; width parameter for Gaussian distribution (mm -1)
+
   !
   ! !PUBLIC MEMBER FUNCTIONS:
   public :: pftconrd ! Read and initialize vegetation (PFT) constants
@@ -597,6 +606,22 @@ contains
     allocate( gcbc_q             (0:mxpft) )
     allocate( gcbr_p             (0:mxpft) )
     allocate( gcbr_q             (0:mxpft) )
+    
+    ! salinity parameters
+    allocate( sal_threshold      (0:mxpft) )
+    allocate( sal_opt            (0:mxpft) )
+    allocate( sal_tol            (0:mxpft) )
+    allocate( waterlevel_threshold(0:mxpft) )
+    allocate( waterlevel_opt     (0:mxpft) )
+    allocate( waterlevel_tol     (0:mxpft) )
+
+    sal_threshold(:)        = 50.0e6_r8 ! Very high value to effectively turn off if unset
+    sal_opt(:)              = 0.0_r8
+    sal_tol(:)              = 50.0_r8
+
+    waterlevel_threshold(:) = 50.0e6_r8 ! Very high value to effectively turn off if unset
+    waterlevel_opt(:)       = 0.0_r8
+    waterlevel_tol(:)       = 50.0_r8
 
     ! Set specific vegetation type values
 

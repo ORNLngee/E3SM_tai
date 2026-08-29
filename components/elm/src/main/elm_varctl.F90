@@ -19,6 +19,10 @@ module elm_varctl
   public :: cnallocate_carbonphosphorus_only_set
   public :: cnallocate_carbonphosphorus_only
   public :: get_carbontag ! get the tag for carbon simulations
+
+  ! a temporary solution for namelist reading issues with Mac clang based gfortran compiler
+  public :: elm_ctl_set_nls
+
   !
   private
   save
@@ -462,6 +466,26 @@ module elm_varctl
   !$acc declare copyin(initth_pf2clm)
   !$acc declare copyin(pf_clmnstep0 )
 
+  !----------------------------------------------------------
+  ! Alquimia external model
+  !----------------------------------------------------------
+  logical, public           :: use_alquimia         = .false.
+  character(len=256), public :: alquimia_inputfile   = 'alquimia_io/pflotran.in'
+  character(len=32), public :: alquimia_engine_name = 'pflotran'
+  character(len=32), public :: alquimia_IC_name     = 'initial' ! Initial condition
+  character(len=32), public :: alquimia_CO2_name    = 'CO2(aq)' ! Name of CO2 in reaction network
+  character(len=32), public :: alquimia_NH4_name    = 'NH4+' ! Name of NH4 in reaction network
+  character(len=32), public :: alquimia_NO3_name    = 'NO3-' ! Name in reaction network
+  character(len=32), public :: alquimia_Nimm_name   = 'Nimm' ! Name in reaction network
+  character(len=32), public :: alquimia_Nimp_name   = 'Nimp' ! Name in reaction network
+  character(len=32), public :: alquimia_Nmin_name   = 'Nmin' ! Name in reaction network
+  character(len=32), public :: alquimia_plantNO3uptake_name = 'Tracer' ! Name in reaction network
+  character(len=32), public :: alquimia_plantNH4uptake_name = 'Tracer2' ! Name in reaction network
+  character(len=32), public :: alquimia_plantNO3demand_name = 'Plant_NO3_demand'
+  character(len=32), public :: alquimia_plantNH4demand_name = 'Plant_NH4_demand'
+  logical, public           :: alquimia_handsoff    = .true.
+
+
   ! cpl_bypass
    character(len=fname_len), public :: metdata_type   = ' '    ! metdata type for CPL_BYPASS mode
    character(len=fname_len), public :: metdata_bypass = ' '    ! met data directory for CPL_BYPASS mode (site, qian, cru_ncep)
@@ -619,5 +643,24 @@ contains
        ctag = 'C14'
     endif
   end function get_carbontag
+
+
+  !----------------------------------------------------------
+  ! on Mac Silicon M chips, clang based gfortran has issue to read a few namelists
+  ! for unknown reason
+  subroutine elm_ctl_set_nls(nu_com_in,           &
+                             use_dynroot_in)
+
+    ! currently 3 nls identified: nu_com, use_dynroot, use_top_solar_rad
+
+    character(len=15), optional, intent(IN) :: nu_com_in                ! nu_com
+    logical,           optional, intent(IN) :: use_dynroot_in           ! use_dynroot
+
+    !
+    if (present(nu_com_in)             ) nu_com            = nu_com_in
+    if (present(use_dynroot_in)        ) use_dynroot       = use_dynroot_in
+
+  end subroutine elm_ctl_set_nls
+
 
 end module elm_varctl

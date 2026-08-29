@@ -383,6 +383,9 @@ module VegetationDataType
     real(r8), pointer :: qflx_over_supply_patch   (:)   => null()   ! over supplied irrigation
     integer , pointer :: n_irrig_steps_left (:)   => null() ! number of time steps for which we still need to irrigate today (if 0, ignore)
 
+    real(r8), pointer :: osm_inhib               (:)   => null() ! Osmotic inhibition of root water uptake
+    real(r8), pointer :: floodf                  (:)   => null() ! Inundation inhibition of root water uptake
+
   contains
     procedure, public :: Init    => veg_wf_init
     procedure, public :: Restart => veg_wf_restart
@@ -5419,6 +5422,9 @@ module VegetationDataType
     allocate(this%qflx_over_supply_patch   (begp:endp))              ; this%qflx_over_supply_patch   (:)   = spval
     allocate(this%n_irrig_steps_left       (begp:endp))              ; this%n_irrig_steps_left       (:)   = 0
 
+    allocate(this%osm_inhib                (begp:endp))              ; this%osm_inhib                (:)   = spval
+    allocate(this%floodf                   (begp:endp))              ; this%floodf                   (:)   = spval
+
     !-----------------------------------------------------------------------
     ! initialize history fields for select members of veg_wf
     !-----------------------------------------------------------------------
@@ -5539,6 +5545,16 @@ module VegetationDataType
             ptr_patch=this%qflx_dew_snow, default='inactive', c2l_scale_type='urbanf')
     end if
 
+    this%osm_inhib(begp:endp) = spval
+    call hist_addfld1d (fname='OSM_INHIB', units='-',  &
+         avgflag='A', long_name='Osmotic inhibition of root water uptake', &
+         ptr_patch=this%osm_inhib, set_lake=0._r8, c2l_scale_type='urbanf')
+
+     this%floodf(begp:endp) = spval
+     call hist_addfld1d (fname='FLOODF', units='-',  &
+         avgflag='A', long_name='Inundation inhibition of root water uptake', &
+         ptr_patch=this%floodf, set_lake=0._r8, c2l_scale_type='urbanf')
+
     !-----------------------------------------------------------------------
     ! set cold-start initial values for select members of veg_wf
     !-----------------------------------------------------------------------
@@ -5554,6 +5570,9 @@ module VegetationDataType
           this%irrig_rate(p)         = 0.0_r8
        end if
     end do
+
+    this%osm_inhib(begp:endp)      = 0.0_r8
+    this%floodf   (begp:endp)      = 0.0_r8
 
   end subroutine veg_wf_init
 
