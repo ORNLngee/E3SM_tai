@@ -27,6 +27,8 @@ module EcosystemDynMod
   use SedFluxType         , only : sedflux_type
   use ColumnDataType      , only : col_cs, c13_col_cs, c14_col_cs
   use ColumnDataType      , only : col_cf, c13_col_cf, c14_col_cf
+  use ColumnDataType      , only : col_es
+  use ColumnDataType      , only : col_ws, col_wf
   use ColumnDataType      , only : col_ns, col_nf
   use ColumnDataType      , only : col_ps, col_pf
   use ColumnDataType      , only : col_es, col_ws, col_wf
@@ -133,6 +135,7 @@ contains
     use perf_mod             , only: t_startf, t_stopf
     use shr_sys_mod          , only: shr_sys_flush
     use PhosphorusDynamicsMod         , only: PhosphorusBiochemMin_balance
+    use elm_varctl                , only: use_alquimia
 
     !
     ! !ARGUMENTS:
@@ -194,7 +197,7 @@ contains
 
     !-----------------------------------------------------------------------
     ! pflotran: when both 'pf-bgc' and 'pf-h' on, no need to call CLM-CN's N leaching module
-    if (.not. (pf_cmode .and. pf_hmode)) then
+    if (.not. (pf_cmode .and. pf_hmode) .and. .not. use_alquimia) then
      call NitrogenLeaching(bounds, num_soilc, filter_soilc, dt)
 
      call PhosphorusLeaching(bounds, num_soilc, filter_soilc, dt)
@@ -516,6 +519,12 @@ contains
     use SoilLittDecompMod            , only: SoilLittDecompAlloc
     use SoilLittDecompMod            , only: SoilLittDecompAlloc2 !after SoilLittDecompAlloc
 
+    use ExternalModelInterfaceMod , only: EMI_Driver
+    use ExternalModelConstants    , only: EM_ID_ALQUIMIA,EM_ALQUIMIA_SOLVE_STAGE
+    use clm_time_manager          , only: get_step_size_real
+    use elm_varctl                , only: use_alquimia
+    use ColumnDataType            , only: col_chem
+    use elm_instMod               , only: waterstate_vars
     !
     ! !ARGUMENTS:
     type(bounds_type)        , intent(in)    :: bounds
@@ -535,7 +544,7 @@ contains
     type(crop_type)          , intent(inout) :: crop_vars
     type(ch4_type)           , intent(in)    :: ch4_vars
     type(photosyns_type)     , intent(in)    :: photosyns_vars
-    type(soilhydrology_type) , intent(in)    :: soilhydrology_vars
+    type(soilhydrology_type) , intent(inout) :: soilhydrology_vars
     type(energyflux_type)    , intent(in)    :: energyflux_vars
 !
     type(sedflux_type)       , intent(in)    :: sedflux_vars
@@ -551,9 +560,34 @@ contains
     event = 'SoilLittDecompAlloc'
     call t_start_lnd(event)
     !----------------------------------------------------------------
-    if(.not.use_elm_interface) then
-       ! directly run elm-bgc
-       ! if (use_elm_interface & use_elm_bgc), then CNDecomAlloc is called in elm_driver
+
+       !----------------------------------------------------------------
+
+    if (use_alquimia) then
+     call t_startf('bgc via alquimia interface')
+   
+     call EMI_Driver(                                    &
+          em_id             = EM_ID_ALQUIMIA            , &
+          em_stage          = EM_ALQUIMIA_SOLVE_STAGE   , &
+          clump_rank        = bounds%clump_index        , &
+          dt                = get_step_size_real()      , &
+          soilstate_vars    = soilstate_vars            , &
+          carbonstate_vars  = col_cs                    , &
+          carbonflux_vars   = col_cf                    , &
+          nitrogenstate_vars= col_ns                    , &
+          nitrogenflux_vars = col_nf                    , &
+          waterstate_vars   = waterstate_vars           , &
+          soilhydrology_vars= soilhydrology_vars        , &
+          col_chem          = col_chem                  , &
+          num_soilc         = num_soilc                 , &
+          filter_soilc      = filter_soilc              , &
+          col_es            = col_es                    , &
+          col_ws            = col_ws                    , &
+          col_wf            = col_wf                      )
+     
+     call t_stopf('bgc via alquimia interface')
+
+    elseif( .not.use_elm_interface) then
        call SoilLittDecompAlloc (bounds, num_soilc, filter_soilc,    &
                   num_soilp, filter_soilp,                     &
                   canopystate_vars, soilstate_vars,            &
