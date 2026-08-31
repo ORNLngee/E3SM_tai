@@ -14,6 +14,7 @@ module pftvarcon
   use elm_varctl  , only : iulog, use_vertsoilc
   use elm_varpar  , only : nlevdecomp_full, nsoilorder
   use elm_varctl  , only : nu_com
+  use elm_varpar  , only : max_tide_coeffs
   !----------------------F.-M. Yuan: 2018-03-23---------------------------------------------------------------------
   use elm_varpar  , only : maxpatch_pft, natpft_lb, natpft_ub, crop_prog
   use elm_varpar  , only : numpft, numcft, natpft_size, cft_size, max_patch_per_col, maxpatch_urb
@@ -317,6 +318,24 @@ module pftvarcon
   real(r8), allocatable :: gcbr_q(:)           !effectiveness of roots in reducing runoff-driven erosion
   real(r8), allocatable :: gcpsi(:)            !bare ground LAI-decay parameter
   real(r8), allocatable :: pftcc(:)            !plant cover reduction factor for transport capacity
+
+  ! Tidal cycle controls
+  integer               :: num_tide_comps      ! Number of tidal cycle components
+  real(r8)              :: tide_baseline       ! Base tide level (mean of cycle) (mm)
+  real(r8),allocatable  :: tide_coeff_amp(:)   ! Amplitude of tide component (mm)
+  real(r8),allocatable  :: tide_coeff_period(:)! Period of tide component (s)
+  real(r8),allocatable  :: tide_coeff_phase(:) ! Phase shift of tide component (s)
+  real(r8)              :: sfcflow_ratescale   ! Rate scale for surface water flow across columns (s-1)
+  real(r8)              :: qflx_h2osfc_surfrate
+
+  !parameters for salinity response function
+  real(r8), allocatable :: sal_threshold(:)    ! threshold for salinity effects (ppt)
+  real(r8), allocatable :: sal_opt(:)          ! Salinity at which optimal biomass occurs (ppt)
+  real(r8), allocatable :: sal_tol(:)          ! Salinity tolerance; width parameter for Gaussian distribution (ppt -1)
+
+  real(r8), allocatable :: waterlevel_threshold(:) !threshold for water level effects (mm above surface)
+  real(r8), allocatable :: waterlevel_opt(:)   ! Water level at which optimal biomass occurs (mm)
+  real(r8), allocatable :: waterlevel_tol(:)   ! Water level tolerance; width parameter for Gaussian distribution (mm -1)
 
   !----------------------F.-M. Yuan (2018-03-23): user-defined parameter file ---------------------------------------------------------------------
   ! NOTE: using 'mergetoclmpft' variable in nc parameter file as a flag
@@ -632,11 +651,39 @@ contains
     allocate( gcpsi              (0:mxpft) )
     allocate( pftcc              (0:mxpft) )
 
+
   !----------------------F.-M. Yuan (2018-03-23): user-defined parameter file ---------------------------------------------------------------------
     allocate( needleleaf         (0:mxpft) )
     allocate( nonvascular        (0:mxpft) )
     allocate( nfixer             (0:mxpft) )
+
+    ! Tidal cycle coefficients
+    allocate( tide_coeff_amp     (max_tide_coeffs))
+    allocate( tide_coeff_phase   (max_tide_coeffs))
+    allocate( tide_coeff_period  (max_tide_coeffs))
+    ! Values should be ignored past num_tide_comps but initialize to be sure
+    tide_coeff_amp(:)    = 0.0
+    tide_coeff_phase(:)  = 0.0
+    tide_coeff_period(:) = 1.0       ! Making period 0 would cause divide by 0 error in sinusoid calculation
+    sfcflow_ratescale    = 7.0e-5_r8 ! Probably better to have default be zero for safety
+    qflx_h2osfc_surfrate = 1.0e-7_r8
     
+    !parameters for salinity response function
+    allocate( sal_threshold      (0:mxpft) )
+    allocate( sal_opt            (0:mxpft) )
+    allocate( sal_tol            (0:mxpft) )
+
+    allocate( waterlevel_threshold(0:mxpft) )
+    allocate( waterlevel_opt     (0:mxpft) )
+    allocate( waterlevel_tol     (0:mxpft) )
+
+    sal_threshold(:)        = 50.0e6_r8 ! Very high value to effectively turn off if unset
+    sal_opt(:)              = 0.0_r8
+    sal_tol(:)              = 50.0_r8
+
+    waterlevel_threshold(:) = 50.0e6_r8 ! Very high value to effectively turn off if unset
+    waterlevel_opt(:)       = 0.0_r8
+    waterlevel_tol(:)       = 50.0_r8
 
     ! Set specific vegetation type values
 

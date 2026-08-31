@@ -66,6 +66,11 @@ Module SoilHydrologyType
      real(r8), pointer :: i_0_col           (:)     => null()! col VIC average saturation in top soil layers
      real(r8), pointer :: ice_col           (:,:)   => null()! col VIC soil ice (kg/m2) for VIC soil layers
 
+     ! Tidal
+     real(r8), pointer :: ht_above_stream   (:)     => null()! Column height difference from stream
+     real(r8), pointer :: dist_from_stream  (:)     => null()! Column distance from stream
+
+
    contains
 
      procedure, public  :: Init
@@ -154,6 +159,10 @@ contains
     allocate(this%max_infil_col     (begc:endc))                 ; this%max_infil_col     (:)     = spval
     allocate(this%i_0_col           (begc:endc))                 ; this%i_0_col           (:)     = spval
     allocate(this%ice_col           (begc:endc,nlayert))         ; this%ice_col           (:,:)   = spval
+    ! TAI
+    allocate(this%ht_above_stream   (begc:endc))                 ; this%ht_above_stream   (:)   = spval
+    allocate(this%dist_from_stream  (begc:endc))                 ; this%dist_from_stream  (:)   = spval
+
 
   end subroutine InitAllocate
 
